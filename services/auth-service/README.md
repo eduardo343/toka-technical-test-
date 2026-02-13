@@ -1,388 +1,98 @@
-# Auth Service
+<p align="center">
+  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
+</p>
 
-## 📋 Descripción
+[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
+[circleci-url]: https://circleci.com/gh/nestjs/nest
 
-Servicio encargado de autenticación, autorización y gestión de tokens. Este es el punto central para validar identidad de usuarios y emitir tokens JWT.
+  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
+    <p align="center">
+<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
+<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
+<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
+<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
+<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
+<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
+<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
+  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
+    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
+  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
+</p>
+  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
+  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
 
-## 🎯 Responsabilidades
+## Description
 
-- ✅ Autenticación de usuarios (login)
-- ✅ Registro de nuevos usuarios
-- ✅ Generación y validación de tokens JWT
-- ✅ Gestión de sesiones
-- ✅ Refresh de tokens
-- ✅ Logout
-- ✅ Cambio de contraseña
-- ✅ Recuperación de contraseña
+[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
 
-## 🏗️ Estructura Recomendada
-
-```
-auth-service/
-├── src/
-│   ├── controllers/          # Controladores HTTP
-│   │   └── auth.controller.ts
-│   ├── services/            # Lógica de negocio
-│   │   ├── auth.service.ts
-│   │   └── token.service.ts
-│   ├── repositories/        # Acceso a datos
-│   │   └── auth.repository.ts
-│   ├── dto/                # Data Transfer Objects locales
-│   │   ├── login.dto.ts
-│   │   ├── register.dto.ts
-│   │   └── token-response.dto.ts
-│   ├── middleware/         # Middleware personalizado
-│   │   └── auth.middleware.ts
-│   ├── guards/             # Guards de seguridad
-│   │   └── jwt.guard.ts
-│   ├── config/             # Configuración
-│   │   └── auth.config.ts
-│   ├── constants/          # Constantes del servicio
-│   │   └── auth.constants.ts
-│   ├── app.ts              # Aplicación principal
-│   └── server.ts           # Servidor
-├── tests/
-│   ├── unit/
-│   ├── integration/
-│   └── e2e/
-├── Dockerfile
-├── docker-compose.test.yml
-├── package.json
-├── tsconfig.json
-├── .env.example
-└── README.md               # Este archivo
-```
-
-## 🔄 Flujos Principales
-
-### Login
-```
-POST /auth/login
-├─ Validar credenciales (email + password)
-├─ Buscar usuario en BD
-├─ Verificar contraseña
-├─ Validar si está activo
-├─ Generar JWT token
-├─ Guardar sesión en Redis
-└─ Retornar token + refresh token
-```
-
-### Register
-```
-POST /auth/register
-├─ Validar email no exista
-├─ Validar contraseña fuerte
-├─ Hash de contraseña
-├─ Crear usuario en BD
-├─ Generar JWT inicial
-└─ Publicar evento USER_CREATED
-```
-
-### Token Refresh
-```
-POST /auth/refresh
-├─ Validar refresh token
-├─ Verificar en Redis
-├─ Generar nuevo access token
-└─ Retornar nuevo token
-```
-
-## 💾 Base de Datos
-
-### Tabla: users
-```sql
-CREATE TABLE users (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  email VARCHAR(255) UNIQUE NOT NULL,
-  password_hash VARCHAR(255) NOT NULL,
-  first_name VARCHAR(100),
-  last_name VARCHAR(100),
-  is_active BOOLEAN DEFAULT true,
-  last_login TIMESTAMP,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-```
-
-### Tabla: refresh_tokens
-```sql
-CREATE TABLE refresh_tokens (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  token VARCHAR(500) UNIQUE NOT NULL,
-  expires_at TIMESTAMP NOT NULL,
-  revoked BOOLEAN DEFAULT false,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-```
-
-## 🔐 Seguridad
-
-### JWT Structure
-```json
-{
-  "header": {
-    "alg": "HS256",
-    "typ": "JWT"
-  },
-  "payload": {
-    "sub": "user_id",
-    "email": "user@example.com",
-    "iat": 1234567890,
-    "exp": 1234571490,
-    "roles": ["user"]
-  },
-  "signature": "..."
-}
-```
-
-### Contraseñas
-- **Hash**: bcrypt (saltRounds: 10)
-- **Requisitos**: 
-  - Mínimo 8 caracteres
-  - Al menos una mayúscula
-  - Al menos un número
-  - Al menos un carácter especial
-
-## 📡 APIs
-
-### POST /auth/register
-```typescript
-Request:
-{
-  "email": "user@example.com",
-  "firstName": "John",
-  "lastName": "Doe",
-  "password": "SecurePass123!"
-}
-
-Response (201):
-{
-  "id": "uuid",
-  "email": "user@example.com",
-  "firstName": "John",
-  "lastName": "Doe",
-  "accessToken": "jwt_token",
-  "refreshToken": "refresh_token",
-  "expiresIn": 3600
-}
-```
-
-### POST /auth/login
-```typescript
-Request:
-{
-  "email": "user@example.com",
-  "password": "SecurePass123!"
-}
-
-Response (200):
-{
-  "accessToken": "jwt_token",
-  "refreshToken": "refresh_token",
-  "user": {
-    "id": "uuid",
-    "email": "user@example.com",
-    "firstName": "John"
-  },
-  "expiresIn": 3600
-}
-```
-
-### POST /auth/refresh
-```typescript
-Request:
-{
-  "refreshToken": "refresh_token"
-}
-
-Response (200):
-{
-  "accessToken": "new_jwt_token",
-  "expiresIn": 3600
-}
-```
-
-### POST /auth/logout
-```typescript
-Request Headers:
-Authorization: Bearer jwt_token
-
-Response (204):
-// Sin contenido
-```
-
-### POST /auth/verify-token
-```typescript
-Request:
-{
-  "token": "jwt_token"
-}
-
-Response (200):
-{
-  "valid": true,
-  "payload": { ... }
-}
-```
-
-## 🔗 Integraciones
-
-### PostgreSQL
-- Almacenar usuarios y contraseñas
-- Almacenar tokens de refresh
-
-### Redis
-- Cache de sesiones activas
-- Blacklist de tokens revocados
-- Rate limiting para login
-
-## 📨 Eventos Publicados
-
-```typescript
-// USER_REGISTERED
-{
-  "eventType": "USER_REGISTERED",
-  "userId": "uuid",
-  "email": "user@example.com",
-  "timestamp": "2026-02-13T10:30:00Z",
-  "version": 1
-}
-
-// LOGIN_SUCCESS
-{
-  "eventType": "LOGIN_SUCCESS",
-  "userId": "uuid",
-  "email": "user@example.com",
-  "ipAddress": "192.168.1.1",
-  "timestamp": "2026-02-13T10:30:00Z",
-  "version": 1
-}
-```
-
-## 🛡️ Middleware Recomendado
-
-### Auth Middleware
-```typescript
-// Verificar JWT en requests protegidos
-middleware.use((req, res, next) => {
-  const token = req.headers.authorization?.split(' ')[1];
-  if (!token) return res.status(401).json({ error: 'Token requerido' });
-  
-  try {
-    req.user = verify(token);
-    next();
-  } catch (error) {
-    res.status(401).json({ error: 'Token inválido' });
-  }
-});
-```
-
-### Rate Limiting
-```typescript
-// Limitar intentos de login
-app.post('/auth/login', rateLimit({
-  windowMs: 15 * 60 * 1000,  // 15 minutos
-  max: 5                       // 5 intentos máximo
-}), loginController);
-```
-
-## 🧪 Testing
-
-### Unit Tests
-```typescript
-describe('AuthService', () => {
-  it('debería registrar un nuevo usuario', async () => {
-    const dto = { email: 'test@example.com', password: 'Pass123!' };
-    const result = await authService.register(dto);
-    expect(result.email).toBe(dto.email);
-  });
-});
-```
-
-### Integration Tests
-- Crear usuario → Login → Refresh token
-- Validar token con Redis
-- Logout y verificar blacklist
-
-## 🚀 Ejecución
+## Project setup
 
 ```bash
-# Instalar dependencias
-npm install
-
-# Configurar variables de entorno
-cp .env.example .env
-
-# Ejecutar migraciones
-npm run migrate
-
-# Iniciar en desarrollo
-npm run dev
-
-# Tests
-npm run test
-
-# Build
-npm run build
-
-# Producción
-npm run start
+$ npm install
 ```
 
-## 📊 Métricas Recomendadas
+## Compile and run the project
 
-- Tasa de registros exitosos
-- Tasa de logins fallidos
-- Tokens generados/refrescados
-- Tiempo de respuesta de autenticación
-- Intentos de tokens inválidos
+```bash
+# development
+$ npm run start
 
-## 🔗 Dependencias Típicas
+# watch mode
+$ npm run start:dev
 
-```json
-{
-  "express": "^4.18.0",
-  "jsonwebtoken": "^9.0.0",
-  "bcryptjs": "^2.4.3",
-  "pg": "^8.10.0",
-  "redis": "^4.6.0",
-  "dotenv": "^16.0.0",
-  "joi": "^17.9.0"
-}
+# production mode
+$ npm run start:prod
 ```
 
-## ⚙️ Variables de Entorno Recomendadas
+## Run tests
 
-```env
-# Servidor
-PORT=3001
-NODE_ENV=development
+```bash
+# unit tests
+$ npm run test
 
-# JWT
-JWT_SECRET=your_secret_key_here
-JWT_EXPIRATION=3600
-REFRESH_TOKEN_EXPIRATION=86400
+# e2e tests
+$ npm run test:e2e
 
-# Base de datos
-DB_HOST=postgres
-DB_PORT=5432
-DB_USER=postgres
-DB_PASSWORD=postgres
-DB_NAME=users_db
-
-# Redis
-REDIS_HOST=redis
-REDIS_PORT=6379
-
-# Seguridad
-BCRYPT_ROUNDS=10
-MAX_LOGIN_ATTEMPTS=5
-
-# CORS
-CORS_ORIGIN=http://localhost:3000
+# test coverage
+$ npm run test:cov
 ```
 
----
+## Deployment
 
-**Última actualización**: Febrero 2026
+When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
+
+If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+
+```bash
+$ npm install -g @nestjs/mau
+$ mau deploy
+```
+
+With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+
+## Resources
+
+Check out a few resources that may come in handy when working with NestJS:
+
+- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
+- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
+- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
+- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
+- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
+- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
+- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
+- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+
+## Support
+
+Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+
+## Stay in touch
+
+- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
+- Website - [https://nestjs.com](https://nestjs.com/)
+- Twitter - [@nestframework](https://twitter.com/nestframework)
+
+## License
+
+Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
