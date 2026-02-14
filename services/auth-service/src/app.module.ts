@@ -1,14 +1,8 @@
 import { Module } from '@nestjs/common';
+import { AuthModule } from './auth/auth.module';
 import { DatabaseModule } from './infrastructure/database/database.module';
-import { AuthController } from './presentation/auth.controller';
-import { User } from './domain/user.entity';
-import { TypeOrmModule } from '@nestjs/typeorm';
 
 @Module({
-  imports: [
-    DatabaseModule,
-    TypeOrmModule.forFeature([User]),
-  ],
-  controllers: [AuthController],
+  imports: [DatabaseModule, AuthModule],
 })
 export class AppModule {}
