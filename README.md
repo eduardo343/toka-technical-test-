@@ -242,7 +242,7 @@ Artifacts:
 
 - reporte de `coverage/` por cada microservicio.
 
-## Cómo correrlo local (modo entrevista)
+## Cómo correrlo local
 
 Script local que replica CI:
 
