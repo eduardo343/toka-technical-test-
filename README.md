@@ -1,6 +1,6 @@
 # Toka Technical Test
 
-Sistema de microservicios desarrollado con **NestJS** y **TypeScript** que implementa autenticación JWT y gestión de usuarios siguiendo los principios de **Clean Architecture**.
+Sistema de microservicios desarrollado con **NestJS** y **TypeScript** que implementa autenticación JWT y gestión de usuarios.
 
 ## 📋 Descripción del Proyecto
 
@@ -8,7 +8,7 @@ Este proyecto es una prueba técnica que demuestra la implementación de una arq
 
 - **Autenticación segura** con JWT y bcrypt
 - **Gestión de usuarios** con operaciones CRUD
-- **Arquitectura limpia** (Clean Architecture) separando capas de dominio, aplicación, infraestructura y presentación
+- **Arquitectura modular** con NestJS
 - **Infraestructura containerizada** con Docker Compose
 
 ## 🏗️ Arquitectura del Proyecto
@@ -16,15 +16,47 @@ Este proyecto es una prueba técnica que demuestra la implementación de una arq
 ```
 toka-technical-test/
 ├── services/
-│   ├── auth-service/          # Microservicio de autenticación (puerto 3001)
-│   └── user-service/          # Microservicio de usuarios
-├── user-service/              # Servicio de usuarios independiente (puerto 3000)
-├── src/                       # Código con Clean Architecture
-│   ├── application/           # Capa de aplicación (servicios/casos de uso)
-│   ├── domain/                # Capa de dominio (entidades, reglas de negocio)
-│   ├── infrastructure/        # Capa de infraestructura (BD, repositorios)
-│   └── presentation/          # Capa de presentación (controladores, DTOs)
-└── docker-compose.yml         # Orquestación de servicios Docker
+│   ├── user-service/                 # Microservicio de usuarios (puerto 3000)
+│   │   ├── src/
+│   │   │   ├── main.ts
+│   │   │   ├── app.module.ts
+│   │   │   └── users/
+│   │   │       ├── users.module.ts
+│   │   │       ├── users.controller.ts
+│   │   │       ├── users.service.ts
+│   │   │       ├── dto/
+│   │   │       │   ├── create-user.dto.ts
+│   │   │       │   └── update-user.dto.ts
+│   │   │       └── entities/
+│   │   │           └── user.entity.ts
+│   │   ├── test/
+│   │   ├── .env
+│   │   └── package.json
+│   │
+│   └── auth-service/                 # Microservicio de autenticación (puerto 3001)
+│       ├── src/
+│       │   ├── main.ts
+│       │   ├── app.module.ts
+│       │   └── auth/
+│       │       ├── auth.module.ts
+│       │       ├── auth.controller.ts
+│       │       ├── auth.service.ts
+│       │       ├── strategies/
+│       │       │   └── jwt.strategy.ts
+│       │       ├── guards/
+│       │       │   └── jwt-auth.guard.ts
+│       │       ├── dto/
+│       │       │   ├── login.dto.ts
+│       │       │   └── register.dto.ts
+│       │       └── entities/
+│       │           └── user.entity.ts
+│       ├── test/
+│       ├── .env
+│       └── package.json
+│
+├── docker-compose.yml
+├── README.md
+└── .gitignore
 ```
 
 ## 🛠️ Stack Tecnológico
@@ -84,7 +116,7 @@ npm run start:dev
 
 **User Service:**
 ```bash
-cd user-service
+cd services/user-service
 npm install
 npm run start:dev
 ```
@@ -148,18 +180,24 @@ npm run test:e2e
 npm run test:cov
 ```
 
-## 📁 Estructura de Clean Architecture
+## 📁 Estructura de Módulos NestJS
+
+Cada microservicio sigue la estructura modular de NestJS:
 
 ```
-src/
-├── application/           # Casos de uso y lógica de aplicación
-│   └── user.service.ts    # Servicio de usuarios (CRUD)
-├── domain/                # Entidades y reglas de negocio
-├── infrastructure/        # Implementaciones técnicas
-│   └── database/          # Configuración y entidades de BD
-└── presentation/          # Interfaces de entrada
-    ├── dto/               # Data Transfer Objects
-    └── user.controller.ts # Controlador REST
+service/
+├── src/
+│   ├── main.ts              # Punto de entrada
+│   ├── app.module.ts        # Módulo raíz
+│   └── <module>/            # Módulo de funcionalidad
+│       ├── <module>.module.ts
+│       ├── <module>.controller.ts
+│       ├── <module>.service.ts
+│       ├── dto/             # Data Transfer Objects
+│       ├── entities/        # Entidades TypeORM
+│       ├── guards/          # Guards de autenticación
+│       └── strategies/      # Estrategias de Passport
+└── .env                     # Variables de entorno
 ```
 
 ## 🔧 Variables de Entorno
