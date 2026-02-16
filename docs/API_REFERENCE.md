@@ -6,6 +6,7 @@ Base URLs locales:
 - Users: `http://localhost:3000`
 - Roles: `http://localhost:3002`
 - Audits: `http://localhost:3003`
+- AI (objetivo): `http://localhost:3004`
 
 ## 1. Auth Service (`auth-service`)
 
@@ -235,14 +236,52 @@ curl "http://localhost:3003/audits?limit=20" \
   -H "Authorization: Bearer $ACCESS_TOKEN"
 ```
 
-## 5. Errores transversales
+## 5. AI Service (`ai-service`) [scaffold]
+
+Estado actual:
+
+- Existen contratos y diseño de referencia.
+- Endpoint funcional aún no expuesto en el stack actual.
+
+Contrato objetivo:
+
+### `POST /ai/ingest`
+
+Body:
+
+```json
+{
+  "documentId": "policy-001",
+  "content": "...",
+  "source": "policy",
+  "tags": ["security", "users"]
+}
+```
+
+### `POST /ai/ask`
+
+Body:
+
+```json
+{
+  "question": "¿Qué endpoint crea usuarios?",
+  "topK": 5,
+  "filters": {
+    "source": "api_reference"
+  }
+}
+```
+
+Ver detalle técnico en `docs/AI_RAG.md`.
+
+## 6. Errores transversales
 
 - `400 Bad Request`: DTO inválido / datos mal formados.
 - `401 Unauthorized`: token ausente, expirado o inválido.
 - `404 Not Found`: recurso inexistente.
 - `409 Conflict`: entidad duplicada (por ejemplo, usuario existente).
 
-## 6. Frontend API routing
+## 7. Frontend API routing
 
 En modo Docker, el frontend usa Nginx como reverse proxy:
 

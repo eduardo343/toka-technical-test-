@@ -2,12 +2,13 @@
 
 ## 1. Visión general
 
-El sistema está compuesto por 4 microservicios backend y 1 frontend:
+El sistema está compuesto por 4 microservicios backend operativos, 1 frontend y 1 servicio de IA en scaffold:
 
 - `auth-service`: autenticación, emisión de tokens OAuth2/OIDC, publicación de eventos de auth.
 - `user-service`: CRUD de usuarios y consumo de eventos de alta de usuario.
 - `role-service`: CRUD de roles y publicación de eventos de dominio.
 - `audit-service`: persistencia de auditoría en MongoDB y consumo de eventos.
+- `ai-service`: microservicio RAG (estructura creada, implementación funcional pendiente).
 - `frontend`: cliente React + Redux con rutas protegidas.
 
 ## 2. Topología técnica
@@ -23,6 +24,7 @@ flowchart TD
     USER["user-service\nNestJS + TypeORM"]
     ROLE["role-service\nNestJS + TypeORM"]
     AUDIT["audit-service\nNestJS + Mongoose"]
+    AI["ai-service\nNestJS + RAG (scaffold)"]
   end
 
   subgraph Infra
@@ -37,16 +39,19 @@ flowchart TD
   FE --> USER
   FE --> ROLE
   FE --> AUDIT
+  FE -.-> AI
 
   AUTH --> PG
   USER --> PG
   ROLE --> PG
   AUDIT --> MG
+  AI -.-> QDRANT
 
   AUTH --> RMQ
   ROLE --> RMQ
   RMQ --> USER
   RMQ --> AUDIT
+  RMQ -.-> AI
 ```
 
 ## 3. Persistencia y ownership de datos
@@ -57,7 +62,9 @@ flowchart TD
   - `toka_roles` -> `role-service`
 - MongoDB:
   - `toka_audit` -> `audit-service`
-- Redis y Qdrant están definidos como infraestructura del entorno.
+- Qdrant:
+  - `toka_knowledge` -> `ai-service` (objetivo de diseño)
+- Redis está definido como infraestructura del entorno.
 
 ## 4. Comunicación síncrona (REST)
 

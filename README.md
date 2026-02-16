@@ -12,6 +12,7 @@ Arquitectura de microservicios con NestJS + PostgreSQL + MongoDB + RabbitMQ + Re
 - [Validación end-to-end](#validación-end-to-end)
 - [Testing y calidad](#testing-y-calidad)
 - [CI](#ci)
+- [Sección IA (RAG)](#sección-ia-rag-estado-actual)
 - [Documentación detallada](#documentación-detallada)
 - [Troubleshooting](#troubleshooting)
 
@@ -19,16 +20,18 @@ Arquitectura de microservicios con NestJS + PostgreSQL + MongoDB + RabbitMQ + Re
 
 Este repositorio incluye:
 
-- 4 microservicios backend:
+- 4 microservicios backend operativos:
   - `auth-service` (OAuth2/OIDC + credenciales)
   - `user-service` (gestión de usuarios)
   - `role-service` (gestión de roles)
   - `audit-service` (auditoría en MongoDB)
+- 1 microservicio de IA en scaffold:
+  - `ai-service` (estructura DDD/Clean para RAG; implementación funcional pendiente)
 - Comunicación síncrona por REST y asíncrona por eventos RabbitMQ.
 - Autenticación distribuida con tokens `RS256` emitidos por `auth-service`.
-- Logging estructurado JSON en todos los servicios.
+- Logging estructurado JSON en todos los servicios backend operativos.
 - Frontend React + Redux con rutas protegidas.
-- Docker Compose con infraestructura + microservicios + frontend.
+- Docker Compose con infraestructura + microservicios operativos + frontend.
 
 ## Arquitectura
 
@@ -38,6 +41,7 @@ flowchart LR
   FE -->|"REST + Bearer"| USER["user-service\n:3000"]
   FE -->|"REST + Bearer"| ROLE["role-service\n:3002"]
   FE -->|"REST + Bearer"| AUDIT["audit-service\n:3003"]
+  FE -.->|"REST (planeado)"| AI["ai-service (RAG)\n:3004"]
 
   AUTH -->|"user.created.v1"| RMQ[(RabbitMQ)]
   AUTH -->|"auth.login.v1"| RMQ
@@ -45,11 +49,13 @@ flowchart LR
 
   RMQ --> USER
   RMQ --> AUDIT
+  RMQ -.-> AI
 
   AUTH --> PG[(PostgreSQL: toka_db)]
   USER --> PGU[(PostgreSQL: toka_users)]
   ROLE --> PGR[(PostgreSQL: toka_roles)]
   AUDIT --> MONGO[(MongoDB: toka_audit)]
+  AI -.-> QDR[(Qdrant)]
 ```
 
 ## Estructura del repositorio
@@ -65,7 +71,8 @@ flowchart LR
 │   ├── auth-service/
 │   ├── user-service/
 │   ├── role-service/
-│   └── audit-service/
+│   ├── audit-service/
+│   └── ai-service/
 ├── scripts/
 │   └── backend-ci-local.sh
 └── docs/
@@ -73,7 +80,8 @@ flowchart LR
     ├── API_REFERENCE.md
     ├── RUNBOOK.md
     ├── THUNDER_CLIENT_GUIDE.md
-    └── INCIDENT_DIAGNOSIS.md
+    ├── INCIDENT_DIAGNOSIS.md
+    └── AI_RAG.md
 ```
 
 Nota: el frontend activo está en `frontend/`. Existe además `frontend/frontend/` como scaffold legado no usado en la ejecución principal.
@@ -87,16 +95,17 @@ Nota: el frontend activo está en `frontend/`. Existe además `frontend/frontend
 | `user-service` | `3000` | CRUD de usuarios |
 | `role-service` | `3002` | CRUD de roles |
 | `audit-service` | `3003` | Consulta de auditoría |
+| `ai-service` | `3004` (reservado) | RAG/IA (scaffold, no levantado en compose aún) |
 | `postgres` | `5433` | Bases `toka_db`, `toka_users`, `toka_roles` |
 | `mongodb` | `27017` | Base `toka_audit` |
 | `rabbitmq` | `5672` | Broker AMQP |
 | `rabbitmq-mgmt` | `15672` | UI RabbitMQ |
 | `redis` | `6379` | Cache/infraestructura |
-| `qdrant` | `6333` | Vector DB (infraestructura) |
+| `qdrant` | `6333` | Vector DB |
 
 ## Arranque rápido
 
-### 1) Levantar todo el stack
+### 1) Levantar stack operativo actual
 
 ```bash
 docker compose up -d --build --remove-orphans
@@ -146,7 +155,7 @@ También está documentado paso a paso en Thunder Client en `docs/THUNDER_CLIENT
 
 ## Testing y calidad
 
-### Backend por microservicio
+### Backend por microservicio operativo
 
 ```bash
 cd services/auth-service && npm ci && npm run test:cov && npm run build
@@ -166,34 +175,20 @@ npm run test:run
 npm run test:coverage
 ```
 
-<<<<<<< HEAD
-### CI local replicando pipeline backend
-=======
-Cada servicio tiene `coverageThreshold` global mínimo de 70% en `package.json`.
+Cada servicio backend operativo tiene `coverageThreshold` global mínimo de 70% en su `package.json`.
 
-## CI (GitHub Actions)
+## CI
 
 Workflow: `.github/workflows/backend-ci.yml`
 
-Trigger:
-
-- `push` a `main`/`master`
-- `pull_request`
-
-Checks bloqueantes por microservicio (`auth`, `user`, `role`, `audit`):
+Qué ejecuta por microservicio (`auth`, `user`, `role`, `audit`):
 
 - `npm ci`
 - `npm run test:cov`
 - `npm run build`
+- subida de artifact de cobertura
 
-Artifacts:
-
-- reporte de `coverage/` por cada microservicio.
-
-## Cómo correrlo local
-
-Script local que replica CI:
->>>>>>> d00b207d8d0cca70087426635e29c2199983ff01
+Script local equivalente:
 
 ```bash
 ./scripts/backend-ci-local.sh
@@ -206,16 +201,28 @@ ONLY_SERVICE=auth-service SKIP_INSTALL=1 ./scripts/backend-ci-local.sh
 RUN_LINT=1 SKIP_INSTALL=1 ./scripts/backend-ci-local.sh
 ```
 
-## CI
+## Sección IA (RAG) estado actual
 
-Workflow: `/Users/alan/toka-technical-test/.github/workflows/backend-ci.yml`
+Estado actual (implementado):
 
-Qué ejecuta por microservicio (`auth`, `user`, `role`, `audit`):
+- Existe scaffold de `ai-service` con estructura DDD/Clean:
+  - `application/rag/use-cases`
+  - `domain/{document,knowledge-base,qa}`
+  - `infrastructure/{embeddings,llm,messaging,vector-store}`
+  - `interfaces/http/dto`
+- Qdrant está disponible en infraestructura (`localhost:6333`).
 
-- `npm ci`
-- `npm run test:cov`
-- `npm run build`
-- subida de artifact de cobertura
+Estado pendiente (no implementado todavía):
+
+- Endpoints funcionales de IA (`/ai/ingest`, `/ai/ask`).
+- Pipeline real de embeddings.
+- Integración real de consulta con vector store.
+- Métricas operativas automáticas de latencia/costo.
+
+Definición técnica de la sección IA:
+
+- Documento completo: `docs/AI_RAG.md`
+- README del servicio: `services/ai-service/README.md`
 
 ## Documentación detallada
 
@@ -224,7 +231,9 @@ Qué ejecuta por microservicio (`auth`, `user`, `role`, `audit`):
 - Runbook operativo: `docs/RUNBOOK.md`
 - Guía Thunder Client: `docs/THUNDER_CLIENT_GUIDE.md`
 - Diagnóstico de incidente: `docs/INCIDENT_DIAGNOSIS.md`
+- IA / RAG: `docs/AI_RAG.md`
 - Frontend: `frontend/README.md`
+- AI service: `services/ai-service/README.md`
 
 ## Troubleshooting
 

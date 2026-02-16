@@ -41,6 +41,12 @@ curl http://localhost:3001/.well-known/jwks.json
 - UI: [http://localhost:15672](http://localhost:15672)
 - Usuario/Password: `guest` / `guest`
 
+### Qdrant disponible
+
+```bash
+curl http://localhost:6333/healthz
+```
+
 ### Frontend disponible
 
 - URL: [http://localhost:5173](http://localhost:5173)
@@ -160,6 +166,13 @@ Ver `frontend/.env.example`:
 - `VITE_AUDIT_API_URL`
 
 En este proyecto se recomienda vacías para usar proxy (`Vite` en dev o `Nginx` en Docker).
+
+### `ai-service` (scaffold)
+
+Variables objetivo documentadas en:
+
+- `/Users/alan/toka-technical-test/services/ai-service/README.md`
+- `/Users/alan/toka-technical-test/docs/AI_RAG.md`
 
 ## 6. Testing y build
 
