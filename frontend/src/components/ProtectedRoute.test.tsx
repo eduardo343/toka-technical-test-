@@ -1,6 +1,5 @@
 import { screen } from "@testing-library/react";
 import { Route, Routes } from "react-router-dom";
-import { describe, it, expect } from "vitest";
 import ProtectedRoute from "./ProtectedRoute";
 import { renderWithProviders } from "../tests/test-utils";
 

@@ -12,9 +12,9 @@ Frontend cliente para la prueba técnica de microservicios.
 - Rutas protegidas con `ProtectedRoute`
 - Estados globales en Redux:
   - `auth` (`token`, `loginLoading`, `registerLoading`, `loginError`, `registerError`)
-  - `users` (`items`, `loading`, `error`)
+  - `users` (`items`, `loading`, `creating`, `updating`, `deleting`, `error`, `success`)
 - Validaciones visuales de formularios y feedback de carga/error
-- Tests con Vitest + React Testing Library
+- Tests con Jest + React Testing Library
 
 ## Requisitos
 
@@ -80,11 +80,16 @@ Abrir:
 - `npm run preview` -> preview local del build
 - `npm run lint` -> análisis estático
 - `npm run test:typecheck` -> typecheck de archivos de test
-- `npm run test` -> modo watch
+- `npm run test` -> ejecución de tests (Jest)
+- `npm run test:watch` -> modo watch
 - `npm run test:run` -> ejecución única
 - `npm run test:coverage` -> cobertura
 
 ## Tests incluidos
 
 - `src/features/auth/Login.test.tsx`
+- `src/features/auth/Register.test.tsx`
 - `src/components/ProtectedRoute.test.tsx`
+- `src/features/users/UsersPage.test.tsx`
+- `src/state/authSlice.test.ts`
+- `src/state/usersSlice.test.ts`
