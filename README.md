@@ -1,248 +1,185 @@
 # Toka Technical Test
 
-Sistema de microservicios desarrollado con **NestJS** y **TypeScript** que implementa autenticación JWT y gestión de usuarios.
+Prueba técnica backend basada en microservicios con NestJS, PostgreSQL y RabbitMQ.
 
-## 📋 Descripción del Proyecto
+## Objetivo
 
-Este proyecto es una prueba técnica que demuestra la implementación de una arquitectura de microservicios con las siguientes características:
+Implementar un sistema de autenticación y perfiles de usuario con:
 
-- **Autenticación segura** con JWT y bcrypt
-- **Gestión de usuarios** con operaciones CRUD
-- **Arquitectura modular** con NestJS
-- **Infraestructura containerizada** con Docker Compose
+- separación por bounded context (`auth-service` y `user-service`)
+- consistencia eventual por eventos
+- configuración por entorno validada
+- infraestructura local reproducible con Docker Compose
 
-## 🏗️ Arquitectura del Proyecto
+## Arquitectura
+
+```
+clients -> auth-service (HTTP + JWT) -> PostgreSQL (toka_db)
+                  |
+                  | emits user.created.v1
+                  v
+             RabbitMQ (queue: user_events)
+                  |
+                  v
+          user-service (HTTP + RMQ consumer) -> PostgreSQL (toka_users)
+```
+
+### Bounded Contexts
+
+- `auth-service`: ownership de credenciales, hash de contraseña y emisión de evento de alta.
+- `user-service`: ownership de perfil (`email`, `name`) y CRUD de usuarios.
+
+No hay lectura/escritura directa entre bases de datos entre servicios.
+
+## Estructura
 
 ```
 toka-technical-test/
-├── services/
-│   ├── user-service/                 # Microservicio de usuarios (puerto 3000)
-│   │   ├── src/
-│   │   │   ├── main.ts
-│   │   │   ├── app.module.ts
-│   │   │   └── users/
-│   │   │       ├── users.module.ts
-│   │   │       ├── users.controller.ts
-│   │   │       ├── users.service.ts
-│   │   │       ├── dto/
-│   │   │       │   ├── create-user.dto.ts
-│   │   │       │   └── update-user.dto.ts
-│   │   │       └── entities/
-│   │   │           └── user.entity.ts
-│   │   ├── test/
-│   │   ├── .env
-│   │   └── package.json
-│   │
-│   └── auth-service/                 # Microservicio de autenticación (puerto 3001)
-│       ├── src/
-│       │   ├── main.ts
-│       │   ├── app.module.ts
-│       │   └── auth/
-│       │       ├── auth.module.ts
-│       │       ├── auth.controller.ts
-│       │       ├── auth.service.ts
-│       │       ├── strategies/
-│       │       │   └── jwt.strategy.ts
-│       │       ├── guards/
-│       │       │   └── jwt-auth.guard.ts
-│       │       ├── dto/
-│       │       │   ├── login.dto.ts
-│       │       │   └── register.dto.ts
-│       │       └── entities/
-│       │           └── user.entity.ts
-│       ├── test/
-│       ├── .env
-│       └── package.json
-│
 ├── docker-compose.yml
-├── README.md
-└── .gitignore
+├── infrastructure/
+│   └── postgres/init/01-create-user-service-db.sql
+└── services/
+    ├── auth-service/
+    │   ├── src/
+    │   │   ├── app.module.ts
+    │   │   ├── config/env.validation.ts
+    │   │   ├── data-source.ts
+    │   │   ├── migrations/
+    │   │   └── auth/
+    │   └── .env.example
+    └── user-service/
+        ├── src/
+        │   ├── app.module.ts
+        │   ├── config/env.validation.ts
+        │   ├── data-source.ts
+        │   ├── migrations/
+        │   └── users/
+        └── .env.example
 ```
 
-## 🛠️ Stack Tecnológico
+## Stack
 
-| Tecnología | Versión | Uso |
-|------------|---------|-----|
-| NestJS | 11.x | Framework backend |
-| TypeScript | 5.7.x | Lenguaje de programación |
-| TypeORM | 0.3.x | ORM para base de datos |
-| PostgreSQL | 15 | Base de datos relacional |
-| MongoDB | 7 | Base de datos NoSQL |
-| Redis | 7 | Cache y sesiones |
-| RabbitMQ | 3 | Message broker |
-| Qdrant | latest | Base de datos vectorial |
-| JWT | - | Autenticación |
-| bcrypt | 6.x | Hash de contraseñas |
+- NestJS 11
+- TypeORM 0.3
+- PostgreSQL 15
+- RabbitMQ 3 (management)
+- Redis 7
+- MongoDB 7
+- Qdrant
 
-## 🚀 Instalación y Configuración
-
-### Prerrequisitos
-
-- Node.js >= 18
-- Docker y Docker Compose
-- npm o yarn
-
-### 1. Clonar el repositorio
+## Levantar infraestructura
 
 ```bash
-git clone <repository-url>
-cd toka-technical-test
+docker compose up -d
 ```
 
-### 2. Levantar la infraestructura con Docker
+Si tu volumen de PostgreSQL ya existía antes de agregar el script de init, resetea volumen para crear `toka_users`:
 
 ```bash
-docker-compose up -d
+docker compose down -v
+docker compose up -d
 ```
 
-Esto iniciará los siguientes servicios:
+## Variables de entorno
 
-| Servicio | Puerto | Descripción |
-|----------|--------|-------------|
-| PostgreSQL | 5433 | Base de datos principal |
-| MongoDB | 27017 | Base de datos NoSQL |
-| Redis | 6379 | Cache |
-| RabbitMQ | 5672, 15672 | Message broker (15672 = panel admin) |
-| Qdrant | 6333 | Base de datos vectorial |
+### auth-service (`services/auth-service/.env`)
 
-### 3. Instalar dependencias e iniciar servicios
+| Variable | Ejemplo |
+| --- | --- |
+| `PORT` | `3001` |
+| `DB_HOST` | `localhost` |
+| `DB_PORT` | `5433` |
+| `DB_USER` | `postgres` |
+| `DB_PASSWORD` | `postgres` |
+| `DB_NAME` | `toka_db` |
+| `DB_MIGRATIONS_RUN` | `true` |
+| `JWT_SECRET` | `replace-with-secure-value` |
+| `JWT_EXPIRES_IN` | `1h` |
+| `RMQ_URL` | `amqp://guest:guest@localhost:5672` |
+| `RMQ_QUEUE` | `user_events` |
 
-**Auth Service:**
+### user-service (`services/user-service/.env`)
+
+| Variable | Ejemplo |
+| --- | --- |
+| `PORT` | `3000` |
+| `DB_HOST` | `localhost` |
+| `DB_PORT` | `5433` |
+| `DB_USER` | `postgres` |
+| `DB_PASSWORD` | `postgres` |
+| `DB_NAME` | `toka_users` |
+| `DB_MIGRATIONS_RUN` | `true` |
+| `RMQ_URL` | `amqp://guest:guest@localhost:5672` |
+| `RMQ_QUEUE` | `user_events` |
+
+## Ejecutar servicios
+
 ```bash
+# auth-service
 cd services/auth-service
 npm install
+npm run migration:run
 npm run start:dev
 ```
 
-**User Service:**
 ```bash
+# user-service
 cd services/user-service
 npm install
+npm run migration:run
 npm run start:dev
 ```
 
-## 📡 API Endpoints
+## Endpoints
 
-### Auth Service (Puerto 3001)
+### auth-service (`http://localhost:3001`)
 
-| Método | Endpoint | Descripción | Body |
-|--------|----------|-------------|------|
-| POST | `/auth/register` | Registrar usuario | `{ email, password }` |
-| POST | `/auth/login` | Iniciar sesión | `{ email, password }` |
-| GET | `/auth/profile` | Obtener perfil (protegido) | Header: `Authorization: Bearer <token>` |
+- `POST /auth/register` body: `{ "email": "user@test.com", "password": "secret123" }`
+- `POST /auth/login` body: `{ "email": "user@test.com", "password": "secret123" }`
+- `GET /auth/profile` header: `Authorization: Bearer <token>`
 
-### User Service (Puerto 3000)
+### user-service (`http://localhost:3000`)
 
-| Método | Endpoint | Descripción | Body |
-|--------|----------|-------------|------|
-| GET | `/users` | Listar usuarios | - |
-| GET | `/users/:id` | Obtener usuario | - |
-| POST | `/users` | Crear usuario | `{ email, name }` |
-| PATCH | `/users/:id` | Actualizar usuario | `{ email?, name? }` |
-| DELETE | `/users/:id` | Eliminar usuario | - |
+- `GET /users`
+- `GET /users/:id`
+- `POST /users` body: `{ "email": "user@test.com", "name": "Alan" }`
+- `PATCH /users/:id` body: `{ "name": "Nuevo Nombre" }`
+- `DELETE /users/:id`
 
-## 🔐 Autenticación
+## Contrato de eventos
 
-El sistema utiliza **JWT (JSON Web Tokens)** para la autenticación:
+- exchange/pattern principal: `user.created.v1`
+- patrón legacy soportado en consumidor: `user.created`
+- payload:
 
-1. **Registro**: El usuario se registra con email y contraseña. La contraseña se hashea con bcrypt.
-2. **Login**: El usuario inicia sesión y recibe un token JWT.
-3. **Rutas protegidas**: Se envía el token en el header `Authorization: Bearer <token>`.
-
-### Ejemplo de uso:
-
-```bash
-# Registrar usuario
-curl -X POST http://localhost:3001/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{"email": "user@example.com", "password": "password123"}'
-
-# Login
-curl -X POST http://localhost:3001/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"email": "user@example.com", "password": "password123"}'
-
-# Acceder a ruta protegida
-curl http://localhost:3001/auth/profile \
-  -H "Authorization: Bearer <tu-token-jwt>"
+```json
+{
+  "id": "uuid",
+  "email": "user@test.com",
+  "name": "optional",
+  "occurredAt": "2026-02-16T10:00:00.000Z"
+}
 ```
 
-## 🧪 Testing
+## Flujo E2E esperado
 
-```bash
-# Tests unitarios
-npm run test
+1. Cliente registra usuario en `auth-service`.
+2. `auth-service` guarda credencial y publica `user.created.v1`.
+3. `user-service` consume el evento y materializa el perfil.
+4. Cliente inicia sesión y usa JWT contra rutas protegidas.
 
-# Tests e2e
-npm run test:e2e
+## Calidad técnica aplicada
 
-# Coverage
-npm run test:cov
-```
+- `synchronize: false` y migraciones iniciales por servicio.
+- Validación de variables de entorno al bootstrap.
+- Cola de RabbitMQ durable.
+- Manejo de conflictos (`email` duplicado) con `409 Conflict`.
+- Separación explícita de ownership de datos entre servicios.
 
-## 📁 Estructura de Módulos NestJS
+## Backlog recomendado (senior)
 
-Cada microservicio sigue la estructura modular de NestJS:
-
-```
-service/
-├── src/
-│   ├── main.ts              # Punto de entrada
-│   ├── app.module.ts        # Módulo raíz
-│   └── <module>/            # Módulo de funcionalidad
-│       ├── <module>.module.ts
-│       ├── <module>.controller.ts
-│       ├── <module>.service.ts
-│       ├── dto/             # Data Transfer Objects
-│       ├── entities/        # Entidades TypeORM
-│       ├── guards/          # Guards de autenticación
-│       └── strategies/      # Estrategias de Passport
-└── .env                     # Variables de entorno
-```
-
-## 🔧 Variables de Entorno
-
-Puedes configurar las siguientes variables (actualmente hardcodeadas para desarrollo):
-
-```env
-# PostgreSQL
-DB_HOST=localhost
-DB_PORT=5433
-DB_USER=postgres
-DB_PASSWORD=postgres
-DB_NAME=toka_db
-
-# JWT
-JWT_SECRET=your-secret-key
-JWT_EXPIRES_IN=1h
-```
-
-## 📝 Comandos Útiles
-
-```bash
-# Desarrollo con hot-reload
-npm run start:dev
-
-# Producción
-npm run build
-npm run start:prod
-
-# Linting
-npm run lint
-
-# Formateo de código
-npm run format
-
-# Docker - levantar servicios
-docker-compose up -d
-
-# Docker - detener servicios
-docker-compose down
-
-# Docker - ver logs
-docker-compose logs -f
-```
-
-## 📄 Licencia
-
-Este proyecto está bajo la licencia UNLICENSED.
+1. Outbox pattern en `auth-service` para garantizar entrega de eventos.
+2. OpenTelemetry + correlation-id para trazabilidad distribuida.
+3. Health checks (`/health`) y readiness/liveness para despliegue.
+4. Contract tests para payloads RMQ versionados.
+5. CI pipeline con lint, test, build y migration check.

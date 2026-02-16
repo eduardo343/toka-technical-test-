@@ -1,46 +1,60 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  ConflictException,
+  Inject,
+  Injectable,
+  Logger,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { User } from './entities/user.entity';
+import { Credential } from './entities/credential.entity';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
+import { ClientProxy } from '@nestjs/microservices';
+import { EMPTY, catchError, timeout } from 'rxjs';
+import { USER_CLIENT, USER_CREATED_EVENT } from './constants';
+import { UserCreatedEvent } from './contracts/user-created.event';
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
-    @InjectRepository(User)
-    private readonly userRepository: Repository<User>,
+    @InjectRepository(Credential)
+    private readonly credRepo: Repository<Credential>,
     private readonly jwtService: JwtService,
+    @Inject(USER_CLIENT) private readonly userClient: ClientProxy,
   ) {}
 
   // =========================
   // REGISTER
   // =========================
   async register(email: string, password: string) {
-    const existingUser = await this.userRepository.findOne({
-      where: { email },
-    });
-
-    if (existingUser) {
-      throw new UnauthorizedException('User already exists');
+    const existing = await this.credRepo.findOne({ where: { email } });
+    if (existing) {
+      throw new ConflictException('User already exists');
     }
 
-    const hashedPassword = await bcrypt.hash(password, 10);
+    const passwordHash = await bcrypt.hash(password, 12);
+    const cred = this.credRepo.create({ email, passwordHash });
+    try {
+      await this.credRepo.save(cred);
+    } catch (error) {
+      if (this.isUniqueViolation(error)) {
+        throw new ConflictException('User already exists');
+      }
+      throw error;
+    }
 
-    const user = this.userRepository.create({
-      email,
-      password: hashedPassword,
+    this.publishUserCreatedEvent({
+      id: cred.id,
+      email: cred.email,
+      occurredAt: new Date().toISOString(),
     });
 
-    await this.userRepository.save(user);
-
-    const token = this.generateToken(user);
-
+    const token = this.generateToken(cred);
     return {
-      user: {
-        id: user.id,
-        email: user.email,
-      },
+      user: { id: cred.id, email: cred.email },
       access_token: token,
     };
   }
@@ -49,39 +63,47 @@ export class AuthService {
   // LOGIN
   // =========================
   async login(email: string, password: string) {
-    const user = await this.userRepository.findOne({
-      where: { email },
-    });
-
-    if (!user) {
+    const cred = await this.credRepo.findOne({ where: { email } });
+    if (!cred) {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    const isPasswordValid = await bcrypt.compare(
-      password,
-      user.password,
-    );
-
-    if (!isPasswordValid) {
+    const ok = await bcrypt.compare(password, cred.passwordHash);
+    if (!ok) {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    const token = this.generateToken(user);
-
-    return {
-      access_token: token,
-    };
+    const token = this.generateToken(cred);
+    return { access_token: token };
   }
 
   // =========================
   // TOKEN GENERATION
   // =========================
-  private generateToken(user: User): string {
-    const payload = {
-      sub: user.id,
-      email: user.email,
-    };
-
+  private generateToken(cred: Credential): string {
+    const payload = { sub: cred.id, email: cred.email };
     return this.jwtService.sign(payload);
+  }
+
+  private publishUserCreatedEvent(payload: UserCreatedEvent): void {
+    this.userClient
+      .emit<UserCreatedEvent>(USER_CREATED_EVENT, payload)
+      .pipe(
+        timeout(2_000),
+        catchError((error: unknown) => {
+          const message = error instanceof Error ? error.stack ?? error.message : String(error);
+          this.logger.error(`Failed to publish "${USER_CREATED_EVENT}"`, message);
+          return EMPTY;
+        }),
+      )
+      .subscribe();
+  }
+
+  private isUniqueViolation(error: unknown): boolean {
+    if (!error || typeof error !== 'object') {
+      return false;
+    }
+
+    return 'code' in error && (error as { code?: string }).code === '23505';
   }
 }
