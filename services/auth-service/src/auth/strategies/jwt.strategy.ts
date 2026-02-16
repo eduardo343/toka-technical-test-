@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { ConfigService } from '@nestjs/config';
+import { getAudience, getIssuer, getOidcPublicKey } from '../oidc/oidc.config';
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
@@ -9,7 +10,10 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
-      secretOrKey: cfg.get<string>('JWT_SECRET', 'supersecret'),
+      algorithms: ['RS256'],
+      issuer: getIssuer(cfg),
+      audience: getAudience(cfg),
+      secretOrKey: getOidcPublicKey(cfg),
     });
   }
 

@@ -1,4 +1,4 @@
-const REQUIRED_ENV = ['DB_HOST', 'DB_PORT', 'DB_USER', 'DB_NAME', 'JWT_SECRET'] as const;
+const REQUIRED_ENV = ['DB_HOST', 'DB_PORT', 'DB_USER', 'DB_NAME'] as const;
 
 type EnvMap = Record<string, string | undefined>;
 
@@ -31,6 +31,12 @@ export function validateEnv(raw: Record<string, unknown>): EnvMap {
     JWT_EXPIRES_IN: env.JWT_EXPIRES_IN ?? '1h',
     RMQ_URL: env.RMQ_URL ?? 'amqp://guest:guest@localhost:5672',
     RMQ_QUEUE: env.RMQ_QUEUE ?? 'user_events',
+    AUDIT_EVENTS_QUEUE: env.AUDIT_EVENTS_QUEUE ?? 'audit_events',
+    OIDC_ISSUER: env.OIDC_ISSUER ?? 'http://localhost:3001',
+    OIDC_AUDIENCE: env.OIDC_AUDIENCE ?? 'toka-api',
+    OAUTH_CLIENT_ID: env.OAUTH_CLIENT_ID ?? 'toka-internal-client',
+    OAUTH_CLIENT_SECRET: env.OAUTH_CLIENT_SECRET ?? 'toka-internal-secret',
+    OIDC_KEY_ID: env.OIDC_KEY_ID ?? 'toka-auth-key-1',
     DB_MIGRATIONS_RUN: env.DB_MIGRATIONS_RUN ?? 'true',
   };
 }

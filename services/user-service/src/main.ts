@@ -3,9 +3,14 @@ import { ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';
 import { MicroserviceOptions, Transport } from '@nestjs/microservices';
 import { USER_EVENTS_QUEUE } from './users/constants';
+import { JsonLoggerService } from './shared/logging/json-logger.service';
+import { requestLogger } from './shared/logging/request-logger.middleware';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const serviceName = 'user-service';
+  const app = await NestFactory.create(AppModule, { bufferLogs: true });
+  app.useLogger(new JsonLoggerService(serviceName));
+  app.use(requestLogger(serviceName));
 
   app.useGlobalPipes(new ValidationPipe({
     whitelist: true,
@@ -24,6 +29,5 @@ async function bootstrap() {
 
   const port = process.env.PORT ?? 3000;
   await app.listen(port);
-  console.log(`User Service running on port ${port}`);
 }
 bootstrap();

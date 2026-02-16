@@ -16,9 +16,9 @@ describe('AppController (e2e)', () => {
     await app.init();
   });
 
-  it('/users (GET)', () => {
+  it('/users (GET) requires auth', () => {
     return request(app.getHttpServer())
       .get('/users')
-      .expect(200);
+      .expect(401);
   });
 });

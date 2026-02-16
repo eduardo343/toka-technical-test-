@@ -1,185 +1,245 @@
 # Toka Technical Test
 
-Prueba técnica backend basada en microservicios con NestJS, PostgreSQL y RabbitMQ.
+Prueba técnica backend con arquitectura de microservicios sobre NestJS, PostgreSQL, MongoDB, RabbitMQ y Redis.
 
-## Objetivo
+## Alcance implementado
 
-Implementar un sistema de autenticación y perfiles de usuario con:
+- 4 microservicios backend:
+  - `auth-service`
+  - `user-service`
+  - `role-service`
+  - `audit-service`
+- Comunicación síncrona por REST y asíncrona por eventos con RabbitMQ.
+- Autenticación distribuida con OAuth2/OIDC (issuer central en `auth-service`).
+- Logging estructurado en JSON en todos los servicios.
+- Dockerización por microservicio + `docker-compose.yml` levantando infraestructura y microservicios.
+- Persistencia multi-DB:
+  - PostgreSQL (`auth-service`, `user-service`, `role-service`)
+  - MongoDB (`audit-service`)
+  - Redis en infraestructura.
 
-- separación por bounded context (`auth-service` y `user-service`)
-- consistencia eventual por eventos
-- configuración por entorno validada
-- infraestructura local reproducible con Docker Compose
+## Arquitectura de alto nivel
 
-## Arquitectura
+```text
+Clients
+  |
+  | OAuth2 / OIDC token issuance
+  v
+auth-service (3001) -------------------------------> RabbitMQ (5672)
+  |  \                                                 |   |   |
+  |   \ REST Bearer token (RS256)                     |   |   +--> auth.login.v1
+  |    -------------------------------------------    |   +------> role.created.v1
+  |                                                |   +----------> user.created.v1
+  v                                                v
+user-service (3000)                          audit-service (3003, MongoDB)
+role-service (3002)
 
-```
-clients -> auth-service (HTTP + JWT) -> PostgreSQL (toka_db)
-                  |
-                  | emits user.created.v1
-                  v
-             RabbitMQ (queue: user_events)
-                  |
-                  v
-          user-service (HTTP + RMQ consumer) -> PostgreSQL (toka_users)
-```
-
-### Bounded Contexts
-
-- `auth-service`: ownership de credenciales, hash de contraseña y emisión de evento de alta.
-- `user-service`: ownership de perfil (`email`, `name`) y CRUD de usuarios.
-
-No hay lectura/escritura directa entre bases de datos entre servicios.
-
-## Estructura
-
-```
-toka-technical-test/
-├── docker-compose.yml
-├── infrastructure/
-│   └── postgres/init/01-create-user-service-db.sql
-└── services/
-    ├── auth-service/
-    │   ├── src/
-    │   │   ├── app.module.ts
-    │   │   ├── config/env.validation.ts
-    │   │   ├── data-source.ts
-    │   │   ├── migrations/
-    │   │   └── auth/
-    │   └── .env.example
-    └── user-service/
-        ├── src/
-        │   ├── app.module.ts
-        │   ├── config/env.validation.ts
-        │   ├── data-source.ts
-        │   ├── migrations/
-        │   └── users/
-        └── .env.example
+PostgreSQL:
+- toka_db    (auth)
+- toka_users (user)
+- toka_roles (role)
 ```
 
-## Stack
+## Estructura por microservicio (evidencia DDD/Clean)
 
-- NestJS 11
-- TypeORM 0.3
-- PostgreSQL 15
-- RabbitMQ 3 (management)
-- Redis 7
-- MongoDB 7
-- Qdrant
+### `role-service`
 
-## Levantar infraestructura
+- `src/domain/role/*` -> entidades, contratos (puertos), eventos de dominio.
+- `src/application/roles/use-cases/*` -> casos de uso.
+- `src/infrastructure/persistence/typeorm/*` -> adaptadores de persistencia.
+- `src/infrastructure/messaging/*` -> adaptadores de mensajería.
+- `src/infrastructure/auth/*` -> validación de JWT/OIDC.
+- `src/interfaces/http/*` -> controladores y DTOs.
+
+### `audit-service`
+
+- `src/domain/audit/*` -> modelo y contrato de repositorio.
+- `src/application/audit/use-cases/*` -> casos de uso.
+- `src/infrastructure/persistence/mongo/*` -> repositorio Mongo.
+- `src/infrastructure/messaging/*` -> consumidores de eventos.
+- `src/infrastructure/auth/*` -> validación de JWT/OIDC.
+- `src/interfaces/http/*` -> endpoints REST.
+
+`auth-service` y `user-service` mantienen separación por módulos y ownership de datos; el diseño más explícito de Clean/DDD está reflejado en `role-service` y `audit-service`.
+
+## OAuth2/OIDC distribuido
+
+Issuer: `auth-service`.
+
+Endpoints OIDC/OAuth2:
+
+- `POST /oauth/token`
+  - `grant_type=password`
+  - `grant_type=client_credentials`
+- `GET /.well-known/openid-configuration`
+- `GET /.well-known/jwks.json`
+
+Validación en servicios consumidores (`user`, `role`, `audit`):
+
+- algoritmo `RS256`
+- `issuer` esperado (`OIDC_ISSUER`)
+- `audience` esperada (`OIDC_AUDIENCE`)
+- guard `JwtAuthGuard` en endpoints protegidos.
+
+## Eventos asíncronos
+
+Patrones de evento:
+
+- `user.created.v1`
+- `role.created.v1`
+- `auth.login.v1`
+
+Colas:
+
+- `user_events` (consumida por `user-service`)
+- `audit_events` (consumida por `audit-service`)
+
+## Logging estructurado JSON
+
+Cada servicio incluye:
+
+- `src/shared/logging/json-logger.service.ts`
+- `src/shared/logging/request-logger.middleware.ts`
+
+Campos emitidos en logs:
+
+- `timestamp`
+- `level`
+- `service`
+- `context`
+- `message`
+- `trace` (cuando aplica)
+- `type`, `method`, `path`, `statusCode`, `durationMs` para access logs HTTP.
+
+## Docker
+
+### Dockerfiles por microservicio
+
+- `services/auth-service/Dockerfile`
+- `services/user-service/Dockerfile`
+- `services/role-service/Dockerfile`
+- `services/audit-service/Dockerfile`
+
+### Compose full stack
+
+`docker-compose.yml` levanta:
+
+- Infraestructura:
+  - `postgres`
+  - `mongodb`
+  - `redis`
+  - `rabbitmq`
+  - `qdrant`
+- Microservicios:
+  - `auth-service`
+  - `user-service`
+  - `role-service`
+  - `audit-service`
+
+## Ejecución local
+
+### 1) Levantar todo
 
 ```bash
-docker compose up -d
+docker compose up -d --build
 ```
 
-Si tu volumen de PostgreSQL ya existía antes de agregar el script de init, resetea volumen para crear `toka_users`:
+Si aparecen contenedores huérfanos por cambios de compose:
 
 ```bash
-docker compose down -v
-docker compose up -d
+docker compose up -d --build --remove-orphans
 ```
 
-## Variables de entorno
-
-### auth-service (`services/auth-service/.env`)
-
-| Variable | Ejemplo |
-| --- | --- |
-| `PORT` | `3001` |
-| `DB_HOST` | `localhost` |
-| `DB_PORT` | `5433` |
-| `DB_USER` | `postgres` |
-| `DB_PASSWORD` | `postgres` |
-| `DB_NAME` | `toka_db` |
-| `DB_MIGRATIONS_RUN` | `true` |
-| `JWT_SECRET` | `replace-with-secure-value` |
-| `JWT_EXPIRES_IN` | `1h` |
-| `RMQ_URL` | `amqp://guest:guest@localhost:5672` |
-| `RMQ_QUEUE` | `user_events` |
-
-### user-service (`services/user-service/.env`)
-
-| Variable | Ejemplo |
-| --- | --- |
-| `PORT` | `3000` |
-| `DB_HOST` | `localhost` |
-| `DB_PORT` | `5433` |
-| `DB_USER` | `postgres` |
-| `DB_PASSWORD` | `postgres` |
-| `DB_NAME` | `toka_users` |
-| `DB_MIGRATIONS_RUN` | `true` |
-| `RMQ_URL` | `amqp://guest:guest@localhost:5672` |
-| `RMQ_QUEUE` | `user_events` |
-
-## Ejecutar servicios
+### 2) Verificar estado de contenedores
 
 ```bash
-# auth-service
-cd services/auth-service
-npm install
-npm run migration:run
-npm run start:dev
+docker compose ps
 ```
+
+### 3) Verificar OAuth/OIDC
+
+Token por password grant:
 
 ```bash
-# user-service
-cd services/user-service
-npm install
-npm run migration:run
-npm run start:dev
+curl -X POST http://localhost:3001/oauth/token \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "grant_type": "password",
+    "client_id": "toka-internal-client",
+    "client_secret": "toka-internal-secret",
+    "username": "admin@test.com",
+    "password": "secret123"
+  }'
 ```
 
-## Endpoints
+Metadata OIDC:
 
-### auth-service (`http://localhost:3001`)
-
-- `POST /auth/register` body: `{ "email": "user@test.com", "password": "secret123" }`
-- `POST /auth/login` body: `{ "email": "user@test.com", "password": "secret123" }`
-- `GET /auth/profile` header: `Authorization: Bearer <token>`
-
-### user-service (`http://localhost:3000`)
-
-- `GET /users`
-- `GET /users/:id`
-- `POST /users` body: `{ "email": "user@test.com", "name": "Alan" }`
-- `PATCH /users/:id` body: `{ "name": "Nuevo Nombre" }`
-- `DELETE /users/:id`
-
-## Contrato de eventos
-
-- exchange/pattern principal: `user.created.v1`
-- patrón legacy soportado en consumidor: `user.created`
-- payload:
-
-```json
-{
-  "id": "uuid",
-  "email": "user@test.com",
-  "name": "optional",
-  "occurredAt": "2026-02-16T10:00:00.000Z"
-}
+```bash
+curl http://localhost:3001/.well-known/openid-configuration
 ```
 
-## Flujo E2E esperado
+JWKS:
 
-1. Cliente registra usuario en `auth-service`.
-2. `auth-service` guarda credencial y publica `user.created.v1`.
-3. `user-service` consume el evento y materializa el perfil.
-4. Cliente inicia sesión y usa JWT contra rutas protegidas.
+```bash
+curl http://localhost:3001/.well-known/jwks.json
+```
 
-## Calidad técnica aplicada
+### 4) Verificar endpoints protegidos
 
-- `synchronize: false` y migraciones iniciales por servicio.
-- Validación de variables de entorno al bootstrap.
-- Cola de RabbitMQ durable.
-- Manejo de conflictos (`email` duplicado) con `409 Conflict`.
-- Separación explícita de ownership de datos entre servicios.
+Con `ACCESS_TOKEN`:
 
-## Backlog recomendado (senior)
+```bash
+curl http://localhost:3000/users -H "Authorization: Bearer $ACCESS_TOKEN"
+curl http://localhost:3002/roles -H "Authorization: Bearer $ACCESS_TOKEN"
+curl http://localhost:3003/audits -H "Authorization: Bearer $ACCESS_TOKEN"
+```
 
-1. Outbox pattern en `auth-service` para garantizar entrega de eventos.
-2. OpenTelemetry + correlation-id para trazabilidad distribuida.
-3. Health checks (`/health`) y readiness/liveness para despliegue.
-4. Contract tests para payloads RMQ versionados.
-5. CI pipeline con lint, test, build y migration check.
+Sin token deben responder `401`.
+
+## Variables de entorno (resumen)
+
+### `auth-service`
+
+- DB: `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`
+- OAuth/OIDC: `OIDC_ISSUER`, `OIDC_AUDIENCE`, `OIDC_KEY_ID`, `OAUTH_CLIENT_ID`, `OAUTH_CLIENT_SECRET`
+- Mensajería: `RMQ_URL`, `RMQ_QUEUE`, `AUDIT_EVENTS_QUEUE`
+
+### `user-service`, `role-service`, `audit-service`
+
+- Validación de token: `OIDC_ISSUER`, `OIDC_AUDIENCE`
+- Colas RMQ según servicio.
+- DB según servicio (Postgres o Mongo).
+
+Ver ejemplos completos en cada `.env.example`.
+
+## Endpoints principales
+
+### auth-service (`:3001`)
+
+- `POST /auth/register`
+- `POST /auth/login`
+- `POST /oauth/token`
+- `GET /auth/profile` (protegido)
+- `GET /.well-known/openid-configuration`
+- `GET /.well-known/jwks.json`
+
+### user-service (`:3000`)
+
+- `GET /users` (protegido)
+- `GET /users/:id` (protegido)
+- `POST /users` (protegido)
+- `PATCH /users/:id` (protegido)
+- `DELETE /users/:id` (protegido)
+
+### role-service (`:3002`)
+
+- `GET /roles` (protegido)
+- `GET /roles/:id` (protegido)
+- `POST /roles` (protegido)
+- `PATCH /roles/:id` (protegido)
+- `DELETE /roles/:id` (protegido)
+
+### audit-service (`:3003`)
+
+- `GET /audits` (protegido)
+

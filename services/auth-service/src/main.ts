@@ -1,9 +1,14 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
+import { JsonLoggerService } from './shared/logging/json-logger.service';
+import { requestLogger } from './shared/logging/request-logger.middleware';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const serviceName = 'auth-service';
+  const app = await NestFactory.create(AppModule, { bufferLogs: true });
+  app.useLogger(new JsonLoggerService(serviceName));
+  app.use(requestLogger(serviceName));
 
   app.useGlobalPipes(
     new ValidationPipe({
@@ -16,7 +21,6 @@ async function bootstrap() {
 
   const port = Number(process.env.PORT ?? '3001');
   await app.listen(port);
-  console.log(`Auth Service running on port ${port}`);
 }
 
 bootstrap();

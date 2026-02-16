@@ -11,6 +11,11 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./infrastructure/postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres']
+      interval: 10s
+      timeout: 5s
+      retries: 10
     networks:
       - toka_network
 
@@ -24,6 +29,40 @@ services:
       - '27017:27017'
     volumes:
       - mongo_data:/data/db
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'mongosh',
+          '--username',
+          'admin',
+          '--password',
+          'admin123',
+          '--authenticationDatabase',
+          'admin',
+          '--eval',
+          'db.adminCommand({ ping: 1 })',
+          '--quiet',
+        ]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+    networks:
+      - toka_network
+
+  postgres-bootstrap:
+    image: postgres:15
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGPASSWORD: postgres
+    command: >
+      sh -c "
+        psql -h postgres -U postgres -d postgres -tc \"SELECT 1 FROM pg_database WHERE datname = 'toka_users'\" | grep -q 1 || psql -h postgres -U postgres -d postgres -c \"CREATE DATABASE toka_users\";
+        psql -h postgres -U postgres -d postgres -tc \"SELECT 1 FROM pg_database WHERE datname = 'toka_roles'\" | grep -q 1 || psql -h postgres -U postgres -d postgres -c \"CREATE DATABASE toka_roles\";
+      "
+    restart: 'no'
     networks:
       - toka_network
 
@@ -44,6 +83,11 @@ services:
     ports:
       - '5672:5672'
       - '15672:15672'
+    healthcheck:
+      test: ['CMD', 'rabbitmq-diagnostics', '-q', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 10
     networks:
       - toka_network
 
@@ -54,6 +98,122 @@ services:
       - '6333:6333'
     volumes:
       - qdrant_data:/qdrant/storage
+    networks:
+      - toka_network
+
+  auth-service:
+    build:
+      context: ./services/auth-service
+    container_name: toka_auth_service
+    environment:
+      PORT: 3001
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_NAME: toka_db
+      DB_MIGRATIONS_RUN: 'true'
+      JWT_SECRET: supersecret
+      JWT_EXPIRES_IN: 1h
+      RMQ_URL: amqp://guest:guest@rabbitmq:5672
+      RMQ_QUEUE: user_events
+      AUDIT_EVENTS_QUEUE: audit_events
+      OIDC_ISSUER: http://localhost:3001
+      OIDC_AUDIENCE: toka-api
+      OAUTH_CLIENT_ID: toka-internal-client
+      OAUTH_CLIENT_SECRET: toka-internal-secret
+    ports:
+      - '3001:3001'
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      toka_network:
+        aliases:
+          - auth-service
+
+  user-service:
+    build:
+      context: ./services/user-service
+    container_name: toka_user_service
+    environment:
+      PORT: 3000
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_NAME: toka_users
+      DB_MIGRATIONS_RUN: 'true'
+      RMQ_URL: amqp://guest:guest@rabbitmq:5672
+      RMQ_QUEUE: user_events
+      OIDC_ISSUER: http://localhost:3001
+      OIDC_AUDIENCE: toka-api
+    ports:
+      - '3000:3000'
+    depends_on:
+      postgres:
+        condition: service_healthy
+      postgres-bootstrap:
+        condition: service_completed_successfully
+      rabbitmq:
+        condition: service_healthy
+      auth-service:
+        condition: service_started
+    networks:
+      - toka_network
+
+  role-service:
+    build:
+      context: ./services/role-service
+    container_name: toka_role_service
+    environment:
+      PORT: 3002
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_NAME: toka_roles
+      DB_MIGRATIONS_RUN: 'true'
+      RMQ_URL: amqp://guest:guest@rabbitmq:5672
+      AUDIT_EVENTS_QUEUE: audit_events
+      OIDC_ISSUER: http://localhost:3001
+      OIDC_AUDIENCE: toka-api
+    ports:
+      - '3002:3002'
+    depends_on:
+      postgres:
+        condition: service_healthy
+      postgres-bootstrap:
+        condition: service_completed_successfully
+      rabbitmq:
+        condition: service_healthy
+      auth-service:
+        condition: service_started
+    networks:
+      - toka_network
+
+  audit-service:
+    build:
+      context: ./services/audit-service
+    container_name: toka_audit_service
+    environment:
+      PORT: 3003
+      MONGO_URI: mongodb://admin:admin123@mongodb:27017/toka_audit?authSource=admin
+      RMQ_URL: amqp://guest:guest@rabbitmq:5672
+      AUDIT_EVENTS_QUEUE: audit_events
+      OIDC_ISSUER: http://localhost:3001
+      OIDC_AUDIENCE: toka-api
+    ports:
+      - '3003:3003'
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      auth-service:
+        condition: service_started
     networks:
       - toka_network
 

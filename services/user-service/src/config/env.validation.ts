@@ -30,6 +30,8 @@ export function validateEnv(raw: Record<string, unknown>): EnvMap {
     PORT: String(port),
     RMQ_URL: env.RMQ_URL ?? 'amqp://guest:guest@localhost:5672',
     RMQ_QUEUE: env.RMQ_QUEUE ?? 'user_events',
+    OIDC_ISSUER: env.OIDC_ISSUER ?? 'http://localhost:3001',
+    OIDC_AUDIENCE: env.OIDC_AUDIENCE ?? 'toka-api',
     DB_MIGRATIONS_RUN: env.DB_MIGRATIONS_RUN ?? 'true',
   };
 }
