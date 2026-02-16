@@ -196,6 +196,33 @@ curl http://localhost:3003/audits -H "Authorization: Bearer $ACCESS_TOKEN"
 
 Sin token deben responder `401`.
 
+## Testing y Coverage
+
+Cada microservicio expone:
+
+- `npm test` para pruebas unitarias.
+- `npm run test:cov` para reporte de cobertura.
+
+Ejecución de cobertura por servicio:
+
+```bash
+cd services/auth-service && npm run test:cov
+cd services/user-service && npm run test:cov
+cd services/role-service && npm run test:cov
+cd services/audit-service && npm run test:cov
+```
+
+Resultado verificado (2026-02-16):
+
+| Servicio | Statements | Branches | Functions | Lines |
+| --- | ---: | ---: | ---: | ---: |
+| `auth-service` | 90.71% | 82.45% | 96.15% | 90.51% |
+| `user-service` | 95.71% | 91.66% | 92.85% | 95.23% |
+| `role-service` | 98.57% | 95.00% | 100.00% | 98.30% |
+| `audit-service` | 100.00% | 79.41% | 100.00% | 100.00% |
+
+Cada servicio tiene `coverageThreshold` global mínimo de 70% en `package.json`.
+
 ## Variables de entorno (resumen)
 
 ### `auth-service`
@@ -242,4 +269,3 @@ Ver ejemplos completos en cada `.env.example`.
 ### audit-service (`:3003`)
 
 - `GET /audits` (protegido)
-
