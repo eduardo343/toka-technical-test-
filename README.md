@@ -223,6 +223,59 @@ Resultado verificado (2026-02-16):
 
 Cada servicio tiene `coverageThreshold` global mínimo de 70% en `package.json`.
 
+## CI (GitHub Actions)
+
+Workflow: `.github/workflows/backend-ci.yml`
+
+Trigger:
+
+- `push` a `main`/`master`
+- `pull_request`
+
+Checks bloqueantes por microservicio (`auth`, `user`, `role`, `audit`):
+
+- `npm ci`
+- `npm run test:cov`
+- `npm run build`
+
+Artifacts:
+
+- reporte de `coverage/` por cada microservicio.
+
+## Cómo correrlo local (modo entrevista)
+
+Script local que replica CI:
+
+```bash
+./scripts/backend-ci-local.sh
+```
+
+Variantes útiles para demo:
+
+```bash
+# Solo un microservicio (rápido)
+ONLY_SERVICE=auth-service SKIP_INSTALL=1 ./scripts/backend-ci-local.sh
+
+# Incluir lint de forma opcional
+RUN_LINT=1 SKIP_INSTALL=1 ./scripts/backend-ci-local.sh
+```
+
+Resumen tabular de cobertura generado localmente:
+
+```bash
+./scripts/coverage-summary.sh
+```
+
+Comandos para mostrar evidencia durante la explicación:
+
+```bash
+# Estado del stack
+docker compose ps
+
+# Logs estructurados JSON en runtime
+docker compose logs --tail=50 auth-service user-service role-service audit-service
+```
+
 ## Variables de entorno (resumen)
 
 ### `auth-service`

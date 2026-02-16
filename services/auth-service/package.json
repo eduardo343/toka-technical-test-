@@ -16,6 +16,7 @@
     "migration:generate": "npm run typeorm -- migration:generate src/migrations/auto-schema -p",
     "migration:run": "npm run typeorm -- migration:run",
     "migration:revert": "npm run typeorm -- migration:revert",
+    "lint:check": "eslint \"{src,apps,libs,test}/**/*.ts\"",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
     "test": "jest",
     "test:watch": "jest --watch",
@@ -96,6 +97,11 @@
         "statements": 70
       }
     },
+    "coverageReporters": [
+      "text",
+      "lcov",
+      "json-summary"
+    ],
     "coverageDirectory": "../coverage",
     "testEnvironment": "node"
   }
