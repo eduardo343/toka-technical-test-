@@ -166,7 +166,34 @@ npm run test:run
 npm run test:coverage
 ```
 
+<<<<<<< HEAD
 ### CI local replicando pipeline backend
+=======
+Cada servicio tiene `coverageThreshold` global mínimo de 70% en `package.json`.
+
+## CI (GitHub Actions)
+
+Workflow: `.github/workflows/backend-ci.yml`
+
+Trigger:
+
+- `push` a `main`/`master`
+- `pull_request`
+
+Checks bloqueantes por microservicio (`auth`, `user`, `role`, `audit`):
+
+- `npm ci`
+- `npm run test:cov`
+- `npm run build`
+
+Artifacts:
+
+- reporte de `coverage/` por cada microservicio.
+
+## Cómo correrlo local
+
+Script local que replica CI:
+>>>>>>> d00b207d8d0cca70087426635e29c2199983ff01
 
 ```bash
 ./scripts/backend-ci-local.sh
