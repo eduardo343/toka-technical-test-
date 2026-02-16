@@ -1,192 +1,140 @@
 # Toka Technical Test
 
-Prueba técnica backend con arquitectura de microservicios sobre NestJS, PostgreSQL, MongoDB, RabbitMQ y Redis.
+Arquitectura de microservicios con NestJS + PostgreSQL + MongoDB + RabbitMQ + Redis + frontend React.
 
-## Alcance implementado
+## Tabla de contenido
+
+- [Resumen](#resumen)
+- [Arquitectura](#arquitectura)
+- [Estructura del repositorio](#estructura-del-repositorio)
+- [Stack y puertos](#stack-y-puertos)
+- [Arranque rápido](#arranque-rápido)
+- [Validación end-to-end](#validación-end-to-end)
+- [Testing y calidad](#testing-y-calidad)
+- [CI](#ci)
+- [Documentación detallada](#documentación-detallada)
+- [Troubleshooting](#troubleshooting)
+
+## Resumen
+
+Este repositorio incluye:
 
 - 4 microservicios backend:
-  - `auth-service`
-  - `user-service`
-  - `role-service`
-  - `audit-service`
-- Comunicación síncrona por REST y asíncrona por eventos con RabbitMQ.
-- Autenticación distribuida con OAuth2/OIDC (issuer central en `auth-service`).
-- Logging estructurado en JSON en todos los servicios.
-- Dockerización por microservicio + `docker-compose.yml` levantando infraestructura y microservicios.
-- Persistencia multi-DB:
-  - PostgreSQL (`auth-service`, `user-service`, `role-service`)
-  - MongoDB (`audit-service`)
-  - Redis en infraestructura.
+  - `auth-service` (OAuth2/OIDC + credenciales)
+  - `user-service` (gestión de usuarios)
+  - `role-service` (gestión de roles)
+  - `audit-service` (auditoría en MongoDB)
+- Comunicación síncrona por REST y asíncrona por eventos RabbitMQ.
+- Autenticación distribuida con tokens `RS256` emitidos por `auth-service`.
+- Logging estructurado JSON en todos los servicios.
+- Frontend React + Redux con rutas protegidas.
+- Docker Compose con infraestructura + microservicios + frontend.
 
-## Arquitectura de alto nivel
+## Arquitectura
+
+```mermaid
+flowchart LR
+  FE["Frontend React\n:5173"] -->|"REST + Bearer"| AUTH["auth-service\n:3001"]
+  FE -->|"REST + Bearer"| USER["user-service\n:3000"]
+  FE -->|"REST + Bearer"| ROLE["role-service\n:3002"]
+  FE -->|"REST + Bearer"| AUDIT["audit-service\n:3003"]
+
+  AUTH -->|"user.created.v1"| RMQ[(RabbitMQ)]
+  AUTH -->|"auth.login.v1"| RMQ
+  ROLE -->|"role.created.v1"| RMQ
+
+  RMQ --> USER
+  RMQ --> AUDIT
+
+  AUTH --> PG[(PostgreSQL: toka_db)]
+  USER --> PGU[(PostgreSQL: toka_users)]
+  ROLE --> PGR[(PostgreSQL: toka_roles)]
+  AUDIT --> MONGO[(MongoDB: toka_audit)]
+```
+
+## Estructura del repositorio
 
 ```text
-Clients
-  |
-  | OAuth2 / OIDC token issuance
-  v
-auth-service (3001) -------------------------------> RabbitMQ (5672)
-  |  \                                                 |   |   |
-  |   \ REST Bearer token (RS256)                     |   |   +--> auth.login.v1
-  |    -------------------------------------------    |   +------> role.created.v1
-  |                                                |   +----------> user.created.v1
-  v                                                v
-user-service (3000)                          audit-service (3003, MongoDB)
-role-service (3002)
-
-PostgreSQL:
-- toka_db    (auth)
-- toka_users (user)
-- toka_roles (role)
+.
+├── docker-compose.yml
+├── frontend/
+│   ├── src/
+│   ├── Dockerfile
+│   └── README.md
+├── services/
+│   ├── auth-service/
+│   ├── user-service/
+│   ├── role-service/
+│   └── audit-service/
+├── scripts/
+│   └── backend-ci-local.sh
+└── docs/
+    ├── ARCHITECTURE.md
+    ├── API_REFERENCE.md
+    ├── RUNBOOK.md
+    ├── THUNDER_CLIENT_GUIDE.md
+    └── INCIDENT_DIAGNOSIS.md
 ```
 
-## Estructura por microservicio (evidencia DDD/Clean)
+Nota: el frontend activo está en `frontend/`. Existe además `frontend/frontend/` como scaffold legado no usado en la ejecución principal.
 
-### `role-service`
+## Stack y puertos
 
-- `src/domain/role/*` -> entidades, contratos (puertos), eventos de dominio.
-- `src/application/roles/use-cases/*` -> casos de uso.
-- `src/infrastructure/persistence/typeorm/*` -> adaptadores de persistencia.
-- `src/infrastructure/messaging/*` -> adaptadores de mensajería.
-- `src/infrastructure/auth/*` -> validación de JWT/OIDC.
-- `src/interfaces/http/*` -> controladores y DTOs.
+| Componente | Puerto host | Descripción |
+| --- | ---: | --- |
+| `frontend` | `5173` | Cliente React servido por Nginx |
+| `auth-service` | `3001` | Auth, OAuth2/OIDC |
+| `user-service` | `3000` | CRUD de usuarios |
+| `role-service` | `3002` | CRUD de roles |
+| `audit-service` | `3003` | Consulta de auditoría |
+| `postgres` | `5433` | Bases `toka_db`, `toka_users`, `toka_roles` |
+| `mongodb` | `27017` | Base `toka_audit` |
+| `rabbitmq` | `5672` | Broker AMQP |
+| `rabbitmq-mgmt` | `15672` | UI RabbitMQ |
+| `redis` | `6379` | Cache/infraestructura |
+| `qdrant` | `6333` | Vector DB (infraestructura) |
 
-### `audit-service`
+## Arranque rápido
 
-- `src/domain/audit/*` -> modelo y contrato de repositorio.
-- `src/application/audit/use-cases/*` -> casos de uso.
-- `src/infrastructure/persistence/mongo/*` -> repositorio Mongo.
-- `src/infrastructure/messaging/*` -> consumidores de eventos.
-- `src/infrastructure/auth/*` -> validación de JWT/OIDC.
-- `src/interfaces/http/*` -> endpoints REST.
-
-`auth-service` y `user-service` mantienen separación por módulos y ownership de datos; el diseño más explícito de Clean/DDD está reflejado en `role-service` y `audit-service`.
-
-## OAuth2/OIDC distribuido
-
-Issuer: `auth-service`.
-
-Endpoints OIDC/OAuth2:
-
-- `POST /oauth/token`
-  - `grant_type=password`
-  - `grant_type=client_credentials`
-- `GET /.well-known/openid-configuration`
-- `GET /.well-known/jwks.json`
-
-Validación en servicios consumidores (`user`, `role`, `audit`):
-
-- algoritmo `RS256`
-- `issuer` esperado (`OIDC_ISSUER`)
-- `audience` esperada (`OIDC_AUDIENCE`)
-- guard `JwtAuthGuard` en endpoints protegidos.
-
-## Eventos asíncronos
-
-Patrones de evento:
-
-- `user.created.v1`
-- `role.created.v1`
-- `auth.login.v1`
-
-Colas:
-
-- `user_events` (consumida por `user-service`)
-- `audit_events` (consumida por `audit-service`)
-
-## Logging estructurado JSON
-
-Cada servicio incluye:
-
-- `src/shared/logging/json-logger.service.ts`
-- `src/shared/logging/request-logger.middleware.ts`
-
-Campos emitidos en logs:
-
-- `timestamp`
-- `level`
-- `service`
-- `context`
-- `message`
-- `trace` (cuando aplica)
-- `type`, `method`, `path`, `statusCode`, `durationMs` para access logs HTTP.
-
-## Docker
-
-### Dockerfiles por microservicio
-
-- `services/auth-service/Dockerfile`
-- `services/user-service/Dockerfile`
-- `services/role-service/Dockerfile`
-- `services/audit-service/Dockerfile`
-
-### Compose full stack
-
-`docker-compose.yml` levanta:
-
-- Infraestructura:
-  - `postgres`
-  - `mongodb`
-  - `redis`
-  - `rabbitmq`
-  - `qdrant`
-- Microservicios:
-  - `auth-service`
-  - `user-service`
-  - `role-service`
-  - `audit-service`
-
-## Ejecución local
-
-### 1) Levantar todo
-
-```bash
-docker compose up -d --build
-```
-
-Si aparecen contenedores huérfanos por cambios de compose:
+### 1) Levantar todo el stack
 
 ```bash
 docker compose up -d --build --remove-orphans
 ```
 
-### 2) Verificar estado de contenedores
+### 2) Verificar contenedores
 
 ```bash
 docker compose ps
 ```
 
-### 3) Verificar OAuth/OIDC
+### 3) URLs útiles
 
-Token por password grant:
+- Frontend: [http://localhost:5173](http://localhost:5173)
+- Auth OIDC metadata: [http://localhost:3001/.well-known/openid-configuration](http://localhost:3001/.well-known/openid-configuration)
+- RabbitMQ UI: [http://localhost:15672](http://localhost:15672) (`guest` / `guest`)
+
+## Validación end-to-end
+
+### Flujo mínimo
+
+1. Registrar usuario:
 
 ```bash
-curl -X POST http://localhost:3001/oauth/token \
+curl -X POST http://localhost:3001/auth/register \
   -H 'Content-Type: application/json' \
-  -d '{
-    "grant_type": "password",
-    "client_id": "toka-internal-client",
-    "client_secret": "toka-internal-secret",
-    "username": "admin@test.com",
-    "password": "secret123"
-  }'
+  -d '{"email":"demo@toka.com","password":"secret123"}'
 ```
 
-Metadata OIDC:
+2. Login:
 
 ```bash
-curl http://localhost:3001/.well-known/openid-configuration
+curl -X POST http://localhost:3001/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"demo@toka.com","password":"secret123"}'
 ```
 
-JWKS:
-
-```bash
-curl http://localhost:3001/.well-known/jwks.json
-```
-
-### 4) Verificar endpoints protegidos
-
-Con `ACCESS_TOKEN`:
+3. Con `ACCESS_TOKEN`, consumir servicios protegidos:
 
 ```bash
 curl http://localhost:3000/users -H "Authorization: Bearer $ACCESS_TOKEN"
@@ -194,131 +142,91 @@ curl http://localhost:3002/roles -H "Authorization: Bearer $ACCESS_TOKEN"
 curl http://localhost:3003/audits -H "Authorization: Bearer $ACCESS_TOKEN"
 ```
 
-Sin token deben responder `401`.
+También está documentado paso a paso en Thunder Client en `docs/THUNDER_CLIENT_GUIDE.md`.
 
-## Testing y Coverage
+## Testing y calidad
 
-Cada microservicio expone:
-
-- `npm test` para pruebas unitarias.
-- `npm run test:cov` para reporte de cobertura.
-
-Ejecución de cobertura por servicio:
+### Backend por microservicio
 
 ```bash
-cd services/auth-service && npm run test:cov
-cd services/user-service && npm run test:cov
-cd services/role-service && npm run test:cov
-cd services/audit-service && npm run test:cov
+cd services/auth-service && npm ci && npm run test:cov && npm run build
+cd services/user-service && npm ci && npm run test:cov && npm run build
+cd services/role-service && npm ci && npm run test:cov && npm run build
+cd services/audit-service && npm ci && npm run test:cov && npm run build
 ```
 
-Resultado verificado (2026-02-16):
+### Frontend
 
-| Servicio | Statements | Branches | Functions | Lines |
-| --- | ---: | ---: | ---: | ---: |
-| `auth-service` | 90.71% | 82.45% | 96.15% | 90.51% |
-| `user-service` | 95.71% | 91.66% | 92.85% | 95.23% |
-| `role-service` | 98.57% | 95.00% | 100.00% | 98.30% |
-| `audit-service` | 100.00% | 79.41% | 100.00% | 100.00% |
+```bash
+cd frontend
+npm install
+npm run lint
+npm run build
+npm run test:run
+npm run test:coverage
+```
 
-Cada servicio tiene `coverageThreshold` global mínimo de 70% en `package.json`.
-
-## CI (GitHub Actions)
-
-Workflow: `.github/workflows/backend-ci.yml`
-
-Trigger:
-
-- `push` a `main`/`master`
-- `pull_request`
-
-Checks bloqueantes por microservicio (`auth`, `user`, `role`, `audit`):
-
-- `npm ci`
-- `npm run test:cov`
-- `npm run build`
-
-Artifacts:
-
-- reporte de `coverage/` por cada microservicio.
-
-## Cómo correrlo local (modo entrevista)
-
-Script local que replica CI:
+### CI local replicando pipeline backend
 
 ```bash
 ./scripts/backend-ci-local.sh
 ```
 
-Variantes útiles para demo:
+Opciones:
 
 ```bash
-# Solo un microservicio (rápido)
 ONLY_SERVICE=auth-service SKIP_INSTALL=1 ./scripts/backend-ci-local.sh
-
-# Incluir lint de forma opcional
 RUN_LINT=1 SKIP_INSTALL=1 ./scripts/backend-ci-local.sh
 ```
 
-Resumen tabular de cobertura generado localmente:
+## CI
+
+Workflow: `/Users/alan/toka-technical-test/.github/workflows/backend-ci.yml`
+
+Qué ejecuta por microservicio (`auth`, `user`, `role`, `audit`):
+
+- `npm ci`
+- `npm run test:cov`
+- `npm run build`
+- subida de artifact de cobertura
+
+## Documentación detallada
+
+- Arquitectura: `docs/ARCHITECTURE.md`
+- APIs y contratos: `docs/API_REFERENCE.md`
+- Runbook operativo: `docs/RUNBOOK.md`
+- Guía Thunder Client: `docs/THUNDER_CLIENT_GUIDE.md`
+- Diagnóstico de incidente: `docs/INCIDENT_DIAGNOSIS.md`
+- Frontend: `frontend/README.md`
+
+## Troubleshooting
+
+### Error de nombre de contenedor en Mongo
+
+Si aparece conflicto por `toka_mongo`:
 
 ```bash
-./scripts/coverage-summary.sh
+docker rm -f toka_mongo
+docker compose up -d --build --remove-orphans
 ```
 
-Comandos para mostrar evidencia durante la explicación:
+### Orphans en Compose
 
 ```bash
-# Estado del stack
-docker compose ps
-
-# Logs estructurados JSON en runtime
-docker compose logs --tail=50 auth-service user-service role-service audit-service
+docker compose up -d --remove-orphans
 ```
 
-## Variables de entorno (resumen)
+### `401 Unauthorized` en endpoints protegidos
 
-### `auth-service`
+- Verifica que el token provenga de `auth-service`.
+- Verifica `OIDC_ISSUER` y `OIDC_AUDIENCE` en servicios consumidores.
+- Verifica header: `Authorization: Bearer <token>`.
 
-- DB: `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`
-- OAuth/OIDC: `OIDC_ISSUER`, `OIDC_AUDIENCE`, `OIDC_KEY_ID`, `OAUTH_CLIENT_ID`, `OAUTH_CLIENT_SECRET`
-- Mensajería: `RMQ_URL`, `RMQ_QUEUE`, `AUDIT_EVENTS_QUEUE`
+### Revisar logs de un servicio
 
-### `user-service`, `role-service`, `audit-service`
-
-- Validación de token: `OIDC_ISSUER`, `OIDC_AUDIENCE`
-- Colas RMQ según servicio.
-- DB según servicio (Postgres o Mongo).
-
-Ver ejemplos completos en cada `.env.example`.
-
-## Endpoints principales
-
-### auth-service (`:3001`)
-
-- `POST /auth/register`
-- `POST /auth/login`
-- `POST /oauth/token`
-- `GET /auth/profile` (protegido)
-- `GET /.well-known/openid-configuration`
-- `GET /.well-known/jwks.json`
-
-### user-service (`:3000`)
-
-- `GET /users` (protegido)
-- `GET /users/:id` (protegido)
-- `POST /users` (protegido)
-- `PATCH /users/:id` (protegido)
-- `DELETE /users/:id` (protegido)
-
-### role-service (`:3002`)
-
-- `GET /roles` (protegido)
-- `GET /roles/:id` (protegido)
-- `POST /roles` (protegido)
-- `PATCH /roles/:id` (protegido)
-- `DELETE /roles/:id` (protegido)
-
-### audit-service (`:3003`)
-
-- `GET /audits` (protegido)
+```bash
+docker compose logs -f auth-service
+docker compose logs -f user-service
+docker compose logs -f role-service
+docker compose logs -f audit-service
+```

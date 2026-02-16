@@ -8,7 +8,12 @@
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "lint": "eslint .",
-    "lint:fix": "eslint . --fix"
+    "lint:fix": "eslint . --fix",
+    "test:typecheck": "tsc -p tsconfig.test.json --noEmit",
+    "test": "jest --runInBand",
+    "test:watch": "jest --watch",
+    "test:run": "jest --runInBand",
+    "test:coverage": "jest --coverage --runInBand"
   },
   "dependencies": {
     "@reduxjs/toolkit": "^2.8.2",
@@ -21,13 +26,21 @@
   "devDependencies": {
     "@eslint/js": "^9.39.1",
     "@types/node": "^22.10.7",
+    "@types/jest": "^30.0.0",
     "@types/react": "^18.3.18",
     "@types/react-dom": "^18.3.5",
     "@vitejs/plugin-react": "^4.7.0",
+    "@testing-library/jest-dom": "^6.8.0",
+    "@testing-library/react": "^16.1.0",
+    "@testing-library/user-event": "^14.5.2",
     "eslint": "^9.39.1",
     "eslint-plugin-react-hooks": "^7.0.1",
     "eslint-plugin-react-refresh": "^0.4.24",
     "globals": "^16.0.0",
+    "jsdom": "^26.0.0",
+    "jest": "^30.0.5",
+    "jest-environment-jsdom": "^30.0.5",
+    "ts-jest": "^29.4.1",
     "typescript": "^5.7.3",
     "typescript-eslint": "^8.20.0",
     "vite": "^5.4.19"

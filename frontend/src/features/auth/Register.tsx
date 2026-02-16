@@ -1,30 +1,28 @@
-import { useState } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { useAppDispatch, useAppSelector } from "../../app/hooks";
-import { clearAuthMessages, login } from "../../state/authSlice";
+import { clearAuthMessages, register } from "../../state/authSlice";
 
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-export default function Login() {
+export default function Register() {
   const dispatch = useAppDispatch();
-  const nav = useNavigate();
-  const location = useLocation();
-  const { loginLoading, loginError } = useAppSelector((s) => s.auth);
+  const navigate = useNavigate();
+  const { registerLoading, registerError, registerSuccess } = useAppSelector((s) => s.auth);
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [submitted, setSubmitted] = useState(false);
-  const [expiredSessionNotice] = useState(() => {
-    const expired = sessionStorage.getItem("auth_expired") === "1";
-    if (expired) {
-      sessionStorage.removeItem("auth_expired");
-    }
-    return expired;
-  });
 
   const emailValid = emailRegex.test(email.trim());
-  const passwordValid = password.trim().length > 0;
+  const passwordValid = password.trim().length >= 6;
   const formValid = emailValid && passwordValid;
+
+  useEffect(() => {
+    return () => {
+      dispatch(clearAuthMessages());
+    };
+  }, [dispatch]);
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -34,27 +32,21 @@ export default function Login() {
       return;
     }
 
-    const res = await dispatch(login({ email, password }));
-    if (login.fulfilled.match(res)) {
-      nav("/users");
+    const result = await dispatch(register({ email, password }));
+    if (register.fulfilled.match(result)) {
+      navigate("/users");
     }
   };
 
   const clearMessages = () => {
-    if (loginError) {
+    if (registerError || registerSuccess) {
       dispatch(clearAuthMessages());
     }
   };
 
   return (
     <div style={{ maxWidth: 360, margin: "48px auto" }}>
-      <h2>Login</h2>
-      {location.state && typeof location.state === "object" && "from" in location.state ? (
-        <p style={{ color: "darkorange" }}>Inicia sesión para continuar.</p>
-      ) : null}
-      {expiredSessionNotice ? (
-        <p style={{ color: "darkorange" }}>Tu sesión expiró. Inicia sesión nuevamente.</p>
-      ) : null}
+      <h2>Register</h2>
 
       <form onSubmit={onSubmit} style={{ display: "grid", gap: 8 }}>
         <input
@@ -67,7 +59,7 @@ export default function Login() {
           type="email"
           autoComplete="email"
           aria-label="Email"
-          disabled={loginLoading}
+          disabled={registerLoading}
         />
         {submitted && !emailValid ? (
           <small style={{ color: "crimson" }}>Ingresa un email válido</small>
@@ -80,19 +72,20 @@ export default function Login() {
           }}
           placeholder="password"
           type="password"
-          autoComplete="current-password"
+          autoComplete="new-password"
           aria-label="Password"
-          disabled={loginLoading}
+          disabled={registerLoading}
         />
         {submitted && !passwordValid ? (
-          <small style={{ color: "crimson" }}>La contraseña es obligatoria</small>
+          <small style={{ color: "crimson" }}>La contraseña debe tener al menos 6 caracteres</small>
         ) : null}
-        <button disabled={loginLoading} type="submit">
-          {loginLoading ? "Ingresando..." : "Entrar"}
+        <button disabled={registerLoading} type="submit">
+          {registerLoading ? "Creando cuenta..." : "Crear cuenta"}
         </button>
-        {loginError ? <small style={{ color: "crimson" }}>{loginError}</small> : null}
+        {registerError ? <small style={{ color: "crimson" }}>{registerError}</small> : null}
+        {registerSuccess ? <small style={{ color: "green" }}>{registerSuccess}</small> : null}
         <small>
-          ¿No tienes cuenta? <Link to="/register">Crear cuenta</Link>
+          ¿Ya tienes cuenta? <Link to="/login">Iniciar sesión</Link>
         </small>
       </form>
     </div>
