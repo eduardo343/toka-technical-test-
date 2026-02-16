@@ -18,8 +18,6 @@
     <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
   <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
 </p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
 
 ## Description
 
@@ -96,23 +94,3 @@ Nest is an MIT-licensed open source project. It can grow thanks to the sponsors 
 ## License
 
 Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
-
-# Toka Technical Test - Microservicios con NestJS
-
-## 📋 Descripción General
-
-Proyecto de arquitectura de microservicios construido con **NestJS** y **TypeScript**. El sistema está compuesto por dos servicios principales:
-
-1. **Auth Service** - Servicio de autenticación y autorización
-2. **User Service** - Servicio de gestión de usuarios
-
-### Infraestructura
-- **Base de datos**: PostgreSQL (puerto 5433)
-- **Cache**: Redis (puerto 6379)
-- **Cola de mensajes**: RabbitMQ (puerto 5672, gestión: 15672)
-- **NoSQL**: MongoDB (puerto 27017)
-- **Base de datos vectorial**: Qdrant (puerto 6333)
-
----
-
-## 🏗️ Arquitectura
