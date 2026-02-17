@@ -25,13 +25,13 @@ Este repositorio incluye:
   - `user-service` (gestión de usuarios)
   - `role-service` (gestión de roles)
   - `audit-service` (auditoría en MongoDB)
-- 1 microservicio de IA en scaffold:
-  - `ai-service` (estructura DDD/Clean para RAG; implementación funcional pendiente)
+- 1 microservicio de IA (MVP):
+  - `ai-service` (RAG básico con OpenAI + Qdrant)
 - Comunicación síncrona por REST y asíncrona por eventos RabbitMQ.
 - Autenticación distribuida con tokens `RS256` emitidos por `auth-service`.
 - Logging estructurado JSON en todos los servicios backend operativos.
 - Frontend React + Redux con rutas protegidas.
-- Docker Compose con infraestructura + microservicios operativos + frontend.
+- Docker Compose con infraestructura + microservicios + frontend.
 
 ## Arquitectura
 
@@ -41,7 +41,7 @@ flowchart LR
   FE -->|"REST + Bearer"| USER["user-service\n:3000"]
   FE -->|"REST + Bearer"| ROLE["role-service\n:3002"]
   FE -->|"REST + Bearer"| AUDIT["audit-service\n:3003"]
-  FE -.->|"REST (planeado)"| AI["ai-service (RAG)\n:3004"]
+  FE -->|"REST"| AI["ai-service (RAG)\n:3004"]
 
   AUTH -->|"user.created.v1"| RMQ[(RabbitMQ)]
   AUTH -->|"auth.login.v1"| RMQ
@@ -95,7 +95,7 @@ Nota: el frontend activo está en `frontend/`. Existe además `frontend/frontend
 | `user-service` | `3000` | CRUD de usuarios |
 | `role-service` | `3002` | CRUD de roles |
 | `audit-service` | `3003` | Consulta de auditoría |
-| `ai-service` | `3004` (reservado) | RAG/IA (scaffold, no levantado en compose aún) |
+| `ai-service` | `3004` | RAG/IA |
 | `postgres` | `5433` | Bases `toka_db`, `toka_users`, `toka_roles` |
 | `mongodb` | `27017` | Base `toka_audit` |
 | `rabbitmq` | `5672` | Broker AMQP |
@@ -162,6 +162,7 @@ cd services/auth-service && npm ci && npm run test:cov && npm run build
 cd services/user-service && npm ci && npm run test:cov && npm run build
 cd services/role-service && npm ci && npm run test:cov && npm run build
 cd services/audit-service && npm ci && npm run test:cov && npm run build
+cd services/ai-service && npm ci && npm run test:cov && npm run build
 ```
 
 ### Frontend
@@ -203,26 +204,35 @@ RUN_LINT=1 SKIP_INSTALL=1 ./scripts/backend-ci-local.sh
 
 ## Sección IA (RAG) estado actual
 
-Estado actual (implementado):
+Implementado:
 
-- Existe scaffold de `ai-service` con estructura DDD/Clean:
-  - `application/rag/use-cases`
-  - `domain/{document,knowledge-base,qa}`
-  - `infrastructure/{embeddings,llm,messaging,vector-store}`
-  - `interfaces/http/dto`
-- Qdrant está disponible en infraestructura (`localhost:6333`).
+- `ai-service` con endpoints:
+  - `GET /ai/health`
+  - `POST /ai/ingest/users`
+  - `POST /ai/ask`
+  - `POST /ai/evaluate`
+- Integración síncrona con:
+  - `auth-service` (`/oauth/token`, `client_credentials`)
+  - `user-service` (`GET /users`)
+- Pipeline RAG básico:
+  - embeddings con OpenAI
+  - indexación/consulta en Qdrant
+  - respuesta con fuentes
+- Evaluación básica por respuesta:
+  - latencia
+  - tokens input/output/embedding
+  - costo estimado
+  - quality checks
 
-Estado pendiente (no implementado todavía):
+Pendiente:
 
-- Endpoints funcionales de IA (`/ai/ingest`, `/ai/ask`).
-- Pipeline real de embeddings.
-- Integración real de consulta con vector store.
-- Métricas operativas automáticas de latencia/costo.
+- Integración asíncrona por eventos para ingestión incremental (RabbitMQ).
+- Hardening de producción (persistencia de rate limiter y observabilidad avanzada).
 
-Definición técnica de la sección IA:
+Documentación IA:
 
-- Documento completo: `docs/AI_RAG.md`
-- README del servicio: `services/ai-service/README.md`
+- Documento técnico: `docs/AI_RAG.md`
+- Servicio IA: `services/ai-service/README.md`
 
 ## Documentación detallada
 

@@ -236,27 +236,30 @@ curl "http://localhost:3003/audits?limit=20" \
   -H "Authorization: Bearer $ACCESS_TOKEN"
 ```
 
-## 5. AI Service (`ai-service`) [scaffold]
+## 5. AI Service (`ai-service`)
 
-Estado actual:
+Base URL local:
 
-- Existen contratos y diseño de referencia.
-- Endpoint funcional aún no expuesto en el stack actual.
+- `http://localhost:3004`
 
-Contrato objetivo:
+Endpoints implementados:
 
-### `POST /ai/ingest`
+- `GET /ai/health`
+- `POST /ai/ingest/users`
+- `POST /ai/ask`
+- `POST /ai/evaluate`
 
-Body:
+### `POST /ai/ingest/users`
+
+Body opcional:
 
 ```json
 {
-  "documentId": "policy-001",
-  "content": "...",
-  "source": "policy",
-  "tags": ["security", "users"]
+  "limit": 50
 }
 ```
+
+Indexa usuarios del `user-service` en Qdrant.
 
 ### `POST /ai/ask`
 
@@ -265,10 +268,7 @@ Body:
 ```json
 {
   "question": "¿Qué endpoint crea usuarios?",
-  "topK": 5,
-  "filters": {
-    "source": "api_reference"
-  }
+  "topK": 5
 }
 ```
 
@@ -289,5 +289,6 @@ En modo Docker, el frontend usa Nginx como reverse proxy:
 - `/users` -> `user-service:3000`
 - `/roles` -> `role-service:3002`
 - `/audits` -> `audit-service:3003`
+- `/ai` -> `ai-service:3004`
 
 Por eso desde browser se usa `http://localhost:5173/...`.

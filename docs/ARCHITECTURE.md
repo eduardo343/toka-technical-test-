@@ -2,13 +2,13 @@
 
 ## 1. Visión general
 
-El sistema está compuesto por 4 microservicios backend operativos, 1 frontend y 1 servicio de IA en scaffold:
+El sistema está compuesto por 4 microservicios backend operativos, 1 frontend y 1 servicio de IA (MVP):
 
 - `auth-service`: autenticación, emisión de tokens OAuth2/OIDC, publicación de eventos de auth.
 - `user-service`: CRUD de usuarios y consumo de eventos de alta de usuario.
 - `role-service`: CRUD de roles y publicación de eventos de dominio.
 - `audit-service`: persistencia de auditoría en MongoDB y consumo de eventos.
-- `ai-service`: microservicio RAG (estructura creada, implementación funcional pendiente).
+- `ai-service`: microservicio RAG con ingestión/consulta sobre Qdrant.
 - `frontend`: cliente React + Redux con rutas protegidas.
 
 ## 2. Topología técnica
@@ -24,7 +24,7 @@ flowchart TD
     USER["user-service\nNestJS + TypeORM"]
     ROLE["role-service\nNestJS + TypeORM"]
     AUDIT["audit-service\nNestJS + Mongoose"]
-    AI["ai-service\nNestJS + RAG (scaffold)"]
+    AI["ai-service\nNestJS + RAG"]
   end
 
   subgraph Infra
@@ -63,7 +63,7 @@ flowchart TD
 - MongoDB:
   - `toka_audit` -> `audit-service`
 - Qdrant:
-  - `toka_knowledge` -> `ai-service` (objetivo de diseño)
+  - `toka_knowledge` -> `ai-service`
 - Redis está definido como infraestructura del entorno.
 
 ## 4. Comunicación síncrona (REST)
@@ -72,6 +72,7 @@ flowchart TD
 - `user-service`: CRUD en `/users` (protegido con JWT).
 - `role-service`: CRUD en `/roles` (protegido con JWT).
 - `audit-service`: `GET /audits` (protegido con JWT).
+- `ai-service`: `GET /ai/health`, `POST /ai/ingest/users`, `POST /ai/ask`, `POST /ai/evaluate`.
 
 ## 5. Comunicación asíncrona (eventos)
 
@@ -134,6 +135,17 @@ Campos principales:
   - mensajería: `services/audit-service/src/infrastructure/messaging/`
   - auth: `services/audit-service/src/infrastructure/auth/`
 - Interfaces HTTP: `services/audit-service/src/interfaces/http/`
+
+### `ai-service`
+
+- Dominio: `services/ai-service/src/domain/`
+- Aplicación (casos de uso): `services/ai-service/src/application/rag/use-cases/`
+- Infraestructura:
+  - embeddings: `services/ai-service/src/infrastructure/embeddings/`
+  - llm: `services/ai-service/src/infrastructure/llm/`
+  - vector store: `services/ai-service/src/infrastructure/vector-store/`
+  - integración servicios: `services/ai-service/src/infrastructure/http/`
+- Interfaces HTTP: `services/ai-service/src/interfaces/http/`
 
 ### `auth-service` y `user-service`
 

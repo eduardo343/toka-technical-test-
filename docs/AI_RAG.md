@@ -8,15 +8,16 @@ Definir la implementación de un microservicio de IA (`ai-service`) con enfoque 
 
 Implementado actualmente:
 
-- Estructura base de `ai-service` en `/Users/alan/toka-technical-test/services/ai-service`.
-- Infraestructura de vector DB disponible (`qdrant` en Docker Compose, puerto `6333`).
+- `ai-service` con endpoints `health`, `ingest/users`, `ask` y `evaluate`.
+- Integración con `auth-service` y `user-service` para ingestión real de usuarios.
+- Pipeline básico de embeddings + upsert/search en Qdrant.
+- Respuesta con métricas de latencia/tokens/costo estimado y quality checks.
 
-Pendiente de implementación funcional:
+Pendiente:
 
-- API del `ai-service`.
-- Pipeline de embeddings e indexación.
-- Flujo de consulta RAG (retrieve + generate).
-- Métricas automáticas de latencia/costo/rate limiting.
+- Ingestión asíncrona por eventos (RabbitMQ) para near-real-time.
+- Persistencia distribuida de rate limiting.
+- Evaluación automática offline (datasets de benchmark).
 
 ## 3. Arquitectura objetivo
 

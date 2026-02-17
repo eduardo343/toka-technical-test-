@@ -55,3 +55,5 @@ export const userApi = createApiClient(import.meta.env.VITE_USER_API_URL);
 export const roleApi = createApiClient(import.meta.env.VITE_ROLE_API_URL);
 
 export const auditApi = createApiClient(import.meta.env.VITE_AUDIT_API_URL);
+
+export const aiApi = createApiClient(import.meta.env.VITE_AI_API_URL);

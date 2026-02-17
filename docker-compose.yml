@@ -217,6 +217,42 @@ services:
     networks:
       - toka_network
 
+  ai-service:
+    build:
+      context: ./services/ai-service
+    container_name: toka_ai_service
+    environment:
+      PORT: 3004
+      OPENAI_API_KEY: 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
+      OPENAI_CHAT_MODEL: gpt-4o-mini
+      OPENAI_EMBEDDING_MODEL: text-embedding-3-small
+      OPENAI_INPUT_PRICE_PER_1K: '0.00015'
+      OPENAI_OUTPUT_PRICE_PER_1K: '0.00060'
+      OPENAI_EMBEDDING_PRICE_PER_1K: '0.00002'
+      QDRANT_URL: http://qdrant:6333
+      QDRANT_COLLECTION: toka_knowledge
+      QDRANT_VECTOR_SIZE: '1536'
+      AI_TOP_K_DEFAULT: '5'
+      AI_RATE_LIMIT_RPM: '60'
+      AUTH_BASE_URL: http://auth-service:3001
+      USER_SERVICE_URL: http://user-service:3000
+      OAUTH_CLIENT_ID: toka-internal-client
+      OAUTH_CLIENT_SECRET: toka-internal-secret
+      OAUTH_SCOPE: openid profile email audit:read roles:write
+    ports:
+      - '3004:3004'
+    depends_on:
+      qdrant:
+        condition: service_started
+      auth-service:
+        condition: service_started
+      user-service:
+        condition: service_started
+    networks:
+      toka_network:
+        aliases:
+          - ai-service
+
   frontend:
     build:
       context: ./frontend
@@ -225,6 +261,7 @@ services:
         VITE_USER_API_URL: ''
         VITE_ROLE_API_URL: ''
         VITE_AUDIT_API_URL: ''
+        VITE_AI_API_URL: ''
     container_name: toka_frontend
     ports:
       - '5173:80'
@@ -236,6 +273,8 @@ services:
       role-service:
         condition: service_started
       audit-service:
+        condition: service_started
+      ai-service:
         condition: service_started
     networks:
       - toka_network

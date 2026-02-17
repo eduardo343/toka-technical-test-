@@ -164,12 +164,24 @@ Ver `frontend/.env.example`:
 - `VITE_USER_API_URL`
 - `VITE_ROLE_API_URL`
 - `VITE_AUDIT_API_URL`
+- `VITE_AI_API_URL`
 
 En este proyecto se recomienda vacías para usar proxy (`Vite` en dev o `Nginx` en Docker).
 
-### `ai-service` (scaffold)
+### `ai-service`
 
-Variables objetivo documentadas en:
+Variables clave:
+
+- `PORT` (default `3004`)
+- `OPENAI_API_KEY`
+- `QDRANT_URL`
+- `QDRANT_COLLECTION`
+- `AUTH_BASE_URL`
+- `USER_SERVICE_URL`
+- `OAUTH_CLIENT_ID`
+- `OAUTH_CLIENT_SECRET`
+
+Detalle completo en:
 
 - `/Users/alan/toka-technical-test/services/ai-service/README.md`
 - `/Users/alan/toka-technical-test/docs/AI_RAG.md`
@@ -183,6 +195,7 @@ cd services/auth-service && npm ci && npm run test:cov && npm run build
 cd services/user-service && npm ci && npm run test:cov && npm run build
 cd services/role-service && npm ci && npm run test:cov && npm run build
 cd services/audit-service && npm ci && npm run test:cov && npm run build
+cd services/ai-service && npm ci && npm run test:cov && npm run build
 ```
 
 ### Frontend
@@ -211,6 +224,7 @@ docker compose logs -f auth-service
 docker compose logs -f user-service
 docker compose logs -f role-service
 docker compose logs -f audit-service
+docker compose logs -f ai-service
 docker compose logs -f frontend
 ```
 

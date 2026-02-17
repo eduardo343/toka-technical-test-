@@ -31,6 +31,7 @@ Variables:
 - `VITE_USER_API_URL`
 - `VITE_ROLE_API_URL`
 - `VITE_AUDIT_API_URL`
+- `VITE_AI_API_URL`
 
 Uso recomendado:
 

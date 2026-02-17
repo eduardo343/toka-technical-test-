@@ -1,0 +1,5 @@
+export const EMBEDDING_PROVIDER = Symbol('EMBEDDING_PROVIDER');
+export const CHAT_PROVIDER = Symbol('CHAT_PROVIDER');
+export const VECTOR_STORE = Symbol('VECTOR_STORE');
+export const AUTH_TOKEN_PROVIDER = Symbol('AUTH_TOKEN_PROVIDER');
+export const USER_DIRECTORY_PROVIDER = Symbol('USER_DIRECTORY_PROVIDER');

@@ -9,3 +9,4 @@ export const authApi = createMockClient();
 export const userApi = createMockClient();
 export const roleApi = createMockClient();
 export const auditApi = createMockClient();
+export const aiApi = createMockClient();
